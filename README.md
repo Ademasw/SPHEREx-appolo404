@@ -1,110 +1,143 @@
-# Apollo 404: SPHEREx Sky Blinker
+# Apollo 404 — рабочий README для команды
 
 > **404: planet not found... yet.**
+>
+> Это внутренний документ для нас пятерых: что делаем, как это будет выглядеть, кто чем занят. README для судей (на английском) напишем ближе к сабмиту.
 
-Team **Apollo 404** at the **NASA Space Apps Challenge 2026** (November 14-15, 2026), challenge **"Planet X and SPHEREx"** (difficulty: Advanced).
-
-**Status:** planning. No code yet. This file describes what we are building and how we split the work.
+**Хакатон:** NASA Space Apps Challenge 2026, 14–15 ноября, 48 часов.
+**Челлендж:** «Planet X and SPHEREx», сложность Advanced. Полный текст: [`docs/challenge-statement.md`](docs/challenge-statement.md).
+**Стек:** бэкенд на Python **FastAPI**, фронтенд на **React** (Vite).
+**Статус:** планирование, кода пока нет.
 
 ---
 
-## The idea
+## 1. Что за задача, коротко
 
-In 1930 Clyde Tombaugh found Pluto by "blinking" between two photographs of the same patch of sky taken on different nights: one dot of light had moved.
+Телескоп NASA **SPHEREx** с мая 2025 года снимает **всё небо раз в полгода в 102 инфракрасных диапазонах**. Один и тот же участок неба фотографируется много раз. Если между снимками какая-то точка сдвинулась, это может быть астероид, комета, близкая звезда, коричневый карлик или даже новая планета.
 
-NASA's **SPHEREx** mission (observing since May 2025) maps the **whole sky every six months in 102 near-infrared bands** and has imaged more than a billion objects. The same patch of sky is photographed again and again, so anything that moves or changes brightness can be spotted: asteroids, comets, nearby stars, brown dwarfs, maybe even a new planet.
+Так в 1930 году нашли Плутон: Томбо «мигал» между двумя фотографиями неба и заметил сдвинувшуюся точку.
 
-**We are building a blink comparator for the SPHEREx sky.**
+**Мы делаем публичный веб-инструмент, «мигалку» для неба SPHEREx:**
 
-## What the challenge asks for
+1. Пользователь вводит координаты (RA и Dec) или название объекта.
+2. Мы показываем серию снимков SPHEREx этого участка **как короткое видео**.
+3. Движущиеся и меняющие яркость объекты сразу видно.
 
-Build a **public web tool** where anyone can:
+### Обязательно (must have)
 
-1. **Enter a sky position** (Right Ascension and Declination).
-2. **See a series of SPHEREx images** of that patch, **played like a short video**, so moving or changing objects are easy to spot.
-3. It must work on the **test targets**:
+- Ввод RA/Dec.
+- Серия снимков, которая проигрывается как видео.
+- Работает на пяти тестовых целях:
 
-| Target | Why it is interesting |
+| Цель | Чем интересна |
 |---|---|
-| Barnard's Star | one of the fastest-moving stars on the sky |
-| Epsilon Indi B | a pair of brown dwarfs orbiting a star |
-| WISE 0855 | fast-moving brown dwarf, RA 08h55m10.831s, Dec -7d14m42.53s |
-| RW Aurigae | variable star |
-| R Draconis | variable star |
+| Barnard's Star | одна из самых быстро движущихся звёзд |
+| Epsilon Indi B | пара коричневых карликов на орбите звезды |
+| WISE 0855 | быстрый коричневый карлик, RA 08h55m10.831s, Dec -7d14m42.53s (133.7951°, -7.2451°) |
+| RW Aurigae | переменная звезда |
+| R Draconis | переменная звезда |
 
-The motions are small, from a fraction of a pixel to a few pixels, so the frames must be **aligned precisely using each image's WCS**, and the **contrast must be chosen well**.
+### Бонусы из текста челленджа (делаем после обязательной части)
 
-### Optional ideas from the challenge (bonus points)
-
-- Easy to update when new SPHEREx data arrives (query the archive live).
-- Creative use of the 102 bands, for example stacking all data per detector array for better signal-to-noise. Extra kudos: **spectra generated on the fly**.
-- **Add or subtract** images taken at different times.
-- **User-selectable field of view** (bigger field = faster movers visible, but more data to download).
-- **Overlay other surveys** (Gaia, WISE), for example with Aladin Lite.
-- **Coordinates in the URL**, so the tool can be embedded elsewhere.
-- Show **metadata such as contamination flags**.
-
-Full official text: [`docs/challenge-statement.md`](docs/challenge-statement.md) (to be added).
+- Легко обновляется при поступлении новых данных (запрашиваем архив вживую).
+- Креативно используем 102 диапазона: например, складываем данные по каждому из 6 детекторов, чтобы было меньше шума. Отдельный плюс — **спектр на лету**.
+- **Сложение и вычитание** снимков разных дат.
+- **Выбор поля зрения (FOV)**: больше поле — видно быстрые объекты, но дольше качать.
+- **Оверлей других обзоров** (Gaia, WISE), например через Aladin Lite.
+- **Координаты в URL**, чтобы инструмент можно было встроить на другой сайт.
+- Показ **метаданных и флагов загрязнения**.
 
 ---
 
-## How it will look (draft)
+## 2. Как это будет выглядеть (черновик)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ ◉ APOLLO 404   planet not found... yet                       │
 ├──────────────────────────────────────────────────────────────┤
-│ [ Barnard's Star  or  133.7951 -7.2451 ]  [Search]           │
+│ [ Barnard's Star  или  133.7951 -7.2451 ]  [Search]          │
 │ Try: (Barnard's Star) (Eps Indi B) (WISE 0855) (RW Aur) (R Dra)│
 │ Detector: D1 D2 [D3] D4 D5 D6     FOV: 0.05° [0.1°] 0.25°    │
 ├────────────────────────────────────┬─────────────────────────┤
 │                                    │ Frame 12 / 84           │
-│        [ image / animation ]       │ date and time (UTC)     │
-│          ⊕ target crosshair        │ detector, wavelength    │
-│                                    │ flags summary           │
+│     [ изображение / анимация ]     │ дата и время (UTC)      │
+│        ⊕ перекрестие на цели       │ детектор, длина волны   │
+│                                    │ сводка по флагам        │
 ├────────────────────────────────────┴─────────────────────────┤
 │ ▶ ❚❚  speed ──●──   ●●●●●───────────●●●●●───────────●●●●     │
-│                     epoch 1           epoch 2         epoch 3│
+│                     эпоха 1           эпоха 2         эпоха 3│
 │ Mode: [Flipbook] [Blink first↔last] [Difference] [Epoch stack]│
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- The five test targets are **one click each** (judges will try them first).
-- Every view has a shareable URL: `?ra=133.7951&dec=-7.2451&det=D3&fov=0.1`.
-- Later: Aladin Lite overlay (Gaia / WISE) and a spectrum of a clicked point.
-
-### Key idea: stack by epoch, then blink
-
-SPHEREx observes each patch in **bursts**: many frames within a few days, then a gap of about six months until the next visit. Inside one burst nothing moves noticeably. So we:
-
-1. **group frames into epochs** (visits),
-2. **stack each epoch** to reduce noise,
-3. **blink or subtract epochs** to make motion obvious.
-
-SPHEREx uses a linear variable filter: every frame of a source is taken at a slightly different wavelength. Brightness can therefore change between frames even for a constant star. We show the wavelength of every frame, and for variable stars we compare frames at similar wavelengths.
-
-> Expected motions (rough estimates from literature values, to be verified on real data): SPHEREx pixels are about 6.2″, Barnard's Star moves about 10″/yr, so roughly 1-3 pixels over the mission so far.
+- Пять тестовых целей открываются **одним кликом**: судьи начнут с них.
+- У любого состояния есть ссылка: `?ra=133.7951&dec=-7.2451&det=D3&fov=0.1`.
+- Позже: оверлей Aladin Lite (Gaia / WISE) и спектр точки по клику.
+- Тексты в интерфейсе — на английском (судьи международные).
 
 ---
 
-## Architecture (planned)
+## 3. Главная идея, на которой строим продукт
 
-**Stack:** Python **FastAPI** backend + **React** (Vite) frontend.
+**Складываем кадры по эпохам, потом мигаем между эпохами.**
+
+SPHEREx снимает каждый участок **пачками**: много кадров за несколько дней, потом перерыв около полугода до следующего визита. Внутри одной пачки объекты почти не двигаются. Поэтому:
+
+1. группируем кадры по эпохам (визитам);
+2. складываем кадры внутри эпохи — шум падает;
+3. мигаем или вычитаем эпохи — движение видно сразу.
+
+**Подводные камни:**
+
+- **Сдвиги маленькие**: от долей пикселя до нескольких пикселей. Без точного выравнивания по WCS и хорошего контраста ничего не будет видно. По справочным оценкам (надо проверить на реальных данных): пиксель SPHEREx около 6,2″, Barnard's Star движется примерно на 10″ в год, то есть 1–3 пикселя за всё время миссии.
+- **У каждого кадра своя длина волны** (в SPHEREx фильтр с переменной длиной волны). Яркость может меняться между кадрами, даже если звезда постоянная. Длину волны показываем на каждом кадре, а переменные звёзды сравниваем по кадрам с близкой длиной волны.
+- **Не смешивать релизы**: в архиве лежат разные версии обработки (QR3, DR1), фильтруем по одной.
+
+---
+
+## 4. Архитектура
 
 ```
-React (Vite) ──HTTP──> FastAPI ──TAP──> NASA/IPAC IRSA (metadata)
-                          │──cutouts──> IRSA (FITS, parallel, with retries)
-                          ├─ WCS alignment, contrast, epoch stacking, differences
-                          ├─ PNG frames + JSON metadata
-                          └─ disk cache (+ precomputed test targets for the demo)
+React (Vite) ──HTTP──> FastAPI ──TAP──> NASA/IPAC IRSA (метаданные)
+                          │──cutouts──> IRSA (FITS, параллельно, с повторами)
+                          ├─ выравнивание по WCS, контраст, стек по эпохам, разность
+                          ├─ PNG кадров + JSON метаданных
+                          └─ кэш на диске (+ заранее посчитанные тест-цели для демо)
 ```
 
-- **Data source:** SPHEREx data at **NASA/IPAC IRSA**. Metadata via TAP (`astroquery`), then small **cutouts** instead of full images. Each cutout is a multi-extension FITS file (`IMAGE`, `FLAGS`, `VARIANCE`, `ZODI`, `EPSF`, `WCS-WAVE`).
-- **Always fresh:** we query IRSA live instead of storing a snapshot, so new data releases show up automatically.
-- **Do not mix releases:** frames from different processing versions are filtered.
-- A query can take tens of seconds, so the API works as a **job + progress polling**.
+- Данные SPHEREx лежат в **NASA/IPAC IRSA**. Метаданные берём через TAP (`astroquery`), потом качаем маленькие **вырезки (cutouts)**, а не полные снимки.
+- Каждая вырезка — FITS из нескольких частей: `IMAGE`, `FLAGS`, `VARIANCE`, `ZODI`, `EPSF`, `WCS-WAVE`.
+- Запрос может идти десятки секунд, поэтому API работает как **задача (job) + опрос прогресса**.
+- Пять тестовых целей считаем заранее, чтобы демо открывалось мгновенно, даже если IRSA тормозит.
+- Не проверено, можно ли качать вырезки прямо из браузера (CORS), поэтому качает бэкенд.
 
-### API contract (draft, to agree on in the first hour)
+### Пример запроса к IRSA (из туториала IRSA, нами ещё не запускался)
+
+```python
+from astroquery.ipac.irsa import Irsa
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+
+coord = SkyCoord(ra=133.7951*u.deg, dec=-7.2451*u.deg)  # WISE 0855
+q = f"""
+SELECT 'https://irsa.ipac.caltech.edu/' || a.uri || '?center={coord.ra.deg},{coord.dec.deg}d&size=0.1' AS uri,
+       p.time_bounds_lower
+FROM spherex.artifact a JOIN spherex.plane p ON a.planeid = p.planeid
+WHERE 1 = CONTAINS(POINT('ICRS', {coord.ra.deg}, {coord.dec.deg}), p.poly)
+  AND p.energy_bandpassname = 'SPHEREx-D2'
+ORDER BY p.time_bounds_lower
+"""
+rows = Irsa.query_tap(q)
+```
+
+Полезное из документации IRSA:
+- `size` задаётся в градусах (в туториале 0.1).
+- Детектор выбирается через `p.energy_bandpassname` (`SPHEREx-D1` … `SPHEREx-D6`).
+- Время кадра — `time_bounds_lower`.
+- Часть запросов вырезок падает по таймауту: нужны повторы и `astropy.utils.data.conf.remote_timeout = 120`.
+- В туториале скачивание в 10 потоков заняло около 0,2 мин против 2,3 мин последовательно.
+
+### Контракт API (черновик — утверждаем в первый час, дальше бэк и фронт работают параллельно)
 
 ```
 GET /api/resolve?name=Barnard's Star      → {ra, dec}
@@ -129,46 +162,67 @@ GET /api/spectrum?ra&dec                  → [{wavelength_um, flux, err, time}]
 }
 ```
 
-*(Values in the example are placeholders, not real data.)*
+*Значения в примере — заглушки, не реальные данные.*
 
 ---
 
-## Team roles
+## 5. Кто что делает
 
-| # | Role | Responsibilities | First milestone (hour 3) |
-|---|---|---|---|
-| 1 | **Data** | TAP queries, release filtering, parallel download with retries, disk cache, name → coordinates | script lists all frames for WISE 0855 (count, dates, detectors) |
-| 2 | **Processing** | WCS alignment to a common grid, contrast stretch, epoch grouping, stacking, differences, wavelength per frame, spectrum | one FITS → good PNG; then an animated GIF where motion is visible |
-| 3 | **Backend + deploy** | FastAPI, jobs and progress, image serving, CORS, caching, public deployment, precomputed test targets | endpoint returns mock JSON, hosting chosen |
-| 4 | **Frontend** | React player, time slider, modes, detector / FOV selectors, URL parameters, then Aladin Lite and spectrum | player animates mock frames |
-| 5 | **Pitch, QA, submission** | mock JSON, README, acknowledgements, branding, testing all five targets as a user, demo video, slides, submission | mock JSON ready, submission and judging rules read |
+Имена впишем, когда распределим роли.
 
-Roles 1 and 2 carry the biggest risk (if motion is not visible, nothing else matters), so they work closely in the first hours.
+| # | Роль | Кто | Задачи | Результат к 3-му часу |
+|---|---|---|---|---|
+| 1 | **Data** | ? | TAP-запросы, фильтр по релизу, параллельная загрузка с повторами, кэш на диске, имя объекта → координаты | скрипт выводит все кадры WISE 0855: сколько, даты, детекторы |
+| 2 | **Processing** | ? | выравнивание по WCS на общую сетку, контраст, группировка по эпохам, стек, разность, длина волны кадра, спектр | один FITS → нормальная PNG; потом GIF, где видно движение |
+| 3 | **Backend + деплой** | ? | FastAPI, jobs и прогресс, отдача картинок, CORS, кэш, публичный деплой, предрасчёт тест-целей | эндпоинт отдаёт mock JSON, выбран хостинг |
+| 4 | **Frontend** | ? | React-плеер, слайдер времени, режимы, выбор детектора и FOV, параметры в URL, потом Aladin Lite и спектр | плеер крутит mock-кадры |
+| 5 | **Pitch, QA, сабмит** | ? | mock JSON для фронта, README для судей, благодарности IRSA и DOI, брендинг, проверка 5 целей как пользователь, видео, слайды, сабмит | mock JSON готов, прочитаны правила сабмита и судейства |
 
-## Timeline
+**Самый большой риск — роли 1 и 2**: если движение не видно, всё остальное не важно. Первые часы им лучше сидеть вместе.
 
-| Hours | Goal |
+Первый шаг для 1 и 2 (до любого UI):
+1. Поставить `astropy`, `astroquery`, `numpy`, `matplotlib`.
+2. Запустить запрос выше для WISE 0855, вывести число кадров и диапазон дат.
+3. Скачать одну вырезку, посмотреть её части, построить WCS и длину волны, нарисовать картинку.
+4. Скачать все вырезки одного детектора, выровнять, собрать GIF. Проверить, что движение WISE 0855 или Barnard's Star видно. Если нет — чинить контраст и выравнивание, пока не будет видно.
+
+---
+
+## 6. План по времени
+
+| Часы | Цель |
 |---|---|
-| 0-3 | End-to-end for WISE 0855: query → frames → GIF with visible motion. Frontend player on mock data. |
-| 3-18 | Must-haves: all five targets, API connected to UI, public deployment. |
-| 18-36 | Extras: epoch stacking, differences, Aladin overlay, spectra, flags. |
-| 36-48 | Bug fixes only, demo video, submission. |
+| 0–3 | Весь путь для WISE 0855: запрос → кадры → GIF с видимым движением. Фронт — плеер на моках. Контракт API утверждён. |
+| 3–18 | Обязательная часть: все 5 целей, API связан с UI, публичный деплой. |
+| 18–36 | Бонусы: стек по эпохам, разность, Aladin, спектры, флаги. |
+| 36–48 | Только багфиксы, демо-видео, сабмит. |
 
-## Open decisions
-
-- [ ] Who takes which role
-- [ ] Backend hosting (needs Python and some disk for the cache)
-- [ ] Frames as pre-rendered PNG (simple, planned for MVP) or raw data with contrast control in the browser
+Submission guide и judging guide опубликованы 13 ноября — роль 5 читает их в самом начале.
 
 ---
 
-## Data and acknowledgements
+## 7. Что надо решить вместе
 
-This project will use data from **SPHEREx**, a NASA mission, obtained from the **NASA/IPAC Infrared Science Archive (IRSA)**. The exact data release DOI and the required IRSA / SPHEREx acknowledgement text will be added here once we start using the data.
+- [ ] Кто какую роль берёт
+- [ ] Где хостим бэкенд (нужен Python и немного диска под кэш): Render, Railway, Hugging Face Spaces или свой VPS
+- [ ] Кадры отдаём готовыми PNG (проще, план для MVP) или сырыми данными с регулировкой контраста в браузере
+- [ ] Как работаем с git: ветки на каждую роль и merge в `main`, `main` всегда рабочий
 
-Useful documentation:
+---
 
-- IRSA SPHEREx cutouts tutorial: https://caltech-ipac.github.io/irsa-tutorials/spherex-cutouts
-- SPHEREx cutout service: https://irsa.ipac.caltech.edu/data/SPHEREx/docs/cutout_tool.html
-- SPHEREx data overview: https://irsa.ipac.caltech.edu/data/SPHEREx/docs/overview_qr.html
+## 8. Питч и бренд (для роли 5)
+
+- История: *«В 1930 году Клайд Томбо нашёл Плутон, мигая между двумя фотографиями. Мы сделали такую мигалку для миллиарда объектов».*
+- Номинации, которые подходят: Best Use of Data, Global Connection (публичный инструмент для гражданской науки), Galactic Impact.
+- Цвета: navy `#0B1D3A`, инфракрасный оранжевый `#FF6B2C`, полосы `#3A2A7A` `#8A2E7E` `#D9455B` `#F27A3A`, сдвинутая полоса `#FFB627`. Шрифты логотипа: Inter Display Bold, DejaVu Sans Mono Bold. Логотип — в архиве `Apollo-404-logo-kit.zip` (в репо пока нет).
+
+---
+
+## Ссылки
+
+- Туториал IRSA по вырезкам SPHEREx: https://caltech-ipac.github.io/irsa-tutorials/spherex-cutouts
+- Сервис вырезок SPHEREx: https://irsa.ipac.caltech.edu/data/SPHEREx/docs/cutout_tool.html
+- Обзор данных SPHEREx: https://irsa.ipac.caltech.edu/data/SPHEREx/docs/overview_qr.html
 - Aladin Lite (CDS): https://aladin.cds.unistra.fr/AladinLite/
+
+В финальном README обязательно укажем DOI использованного релиза и благодарность IRSA / SPHEREx.
