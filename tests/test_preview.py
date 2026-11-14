@@ -20,3 +20,14 @@ def test_invalid_source_pixels_are_not_rendered():
     result = align_nearest(np.ones((size, size)), grid, grid, size, valid)
     assert np.isnan(result[2, 3])
     assert result[3, 2] == 1
+
+
+def test_known_source_flag_is_not_treated_as_bad_pixel():
+    from astropy.io import fits
+    from app.preview import unusable_mask
+    hdu = fits.ImageHDU(np.array([[1 << 21, 1 << 6]], dtype=np.int32))
+    hdu.header["MSKN0021"] = "SOURCE"
+    hdu.header["MSKN0006"] = "NONFUNC"
+    bad, names = unusable_mask(hdu)
+    assert bad.tolist() == [[False, True]]
+    assert names == ["NONFUNC"]

@@ -30,3 +30,12 @@ def test_prepared_preview_can_be_served(tmp_path, monkeypatch):
     response = client.get("/api/preview/frames/0")
     assert response.headers["content-type"] == "image/png"
     assert response.content.startswith(b"\x89PNG")
+
+
+def test_comparison_missing_and_index_bounds(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.main.COMPARISON", tmp_path)
+    client = TestClient(app)
+    assert client.get("/api/comparison").status_code == 404
+    assert client.get("/api/comparison/frames/2").status_code == 404
+    (tmp_path / "manifest.json").write_text('{"frames": []}', encoding="utf-8")
+    assert client.get("/api/comparison").json() == {"frames": []}

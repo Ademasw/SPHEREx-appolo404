@@ -19,6 +19,26 @@ Open http://127.0.0.1:8000/docs for the API documentation.
 Currently implemented: `/api/health`, `/api/targets`, `/api/preview`,
 and `/api/preview/frames/{index}` (three locally prepared diagnostic frames).
 
+## React viewer
+
+Install frontend dependencies and build before starting FastAPI:
+
+```powershell
+cd frontend
+npm install
+npm run build
+cd ..
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Open http://127.0.0.1:8000/ for the viewer. For frontend development, run
+`npm run dev` inside frontend while FastAPI runs on port 8000. Vite proxies
+`/api` to FastAPI. The player supports prepared matched-pair/raw observation
+sets, play/pause, frame selection, interval, zoom, display contrast, inversion,
+source FITS downloads and shareable mode/frame URLs. Changing contrast and
+inversion is visual only. Arbitrary coordinate search is not implemented yet.
+Missing data are shown as an error, with no synthetic fallback.
+
 ## First real-data experiment
 
 The coordinates below come from the challenge's WISE 0855 example. They are
@@ -53,7 +73,30 @@ zodiacal model subtraction, PSF matching, photometry or epoch stacking is applie
 FITS originals, observation metadata, cutout URLs, checksums, flags and display
 parameters are retained. `/api/preview` returns 404 until preparation succeeds.
 
-## Next milestones
+## Catalog audit and two-date blink
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.audit_targets
+.\.venv\Scripts\python.exe -m scripts.prepare_blink
+```
+
+The audit resolves all five identities with SIMBAD (Harvard mirror fallback),
+saves original ECSV tables, verifies the J2000 epoch from column metadata and
+propagates proper motion to J2026 before checking DR1 point coverage.
+Use `--cached-catalog` to reuse the saved tables. This is an estimated fixed
+search center, not an apparent position: observer parallax, radial velocity,
+binary orbital motion and the full trajectory footprint are not modeled.
+
+The blink uses the first and last previously cached D6 cutouts only if their
+central wavelengths agree to within one quarter of the smaller bandwidth.
+It also masks grid pixels with wavelength disagreement above that tolerance.
+The supplied ZODI model is subtracted after verifying spatial grid agreement.
+Both frames use common coverage and one display scale. Outputs are stored in
+data/comparison (two PNGs, blink.gif, provenance manifest), served through
+`/api/comparison` and `/api/comparison/frames/{index}`. This is diagnostic,
+with no PSF matching, complete artifact rejection or confirmed source detection.
+
+## Remaining milestones
 
 1. Verify catalog positions, epochs and motion for all five targets.
 2. Inspect actual coverage in DR1/QR3 separately, including deep collections if needed.
