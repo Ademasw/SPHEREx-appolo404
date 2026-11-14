@@ -96,6 +96,37 @@ data/comparison (two PNGs, blink.gif, provenance manifest), served through
 `/api/comparison` and `/api/comparison/frames/{index}`. This is diagnostic,
 with no PSF matching, complete artifact rejection or confirmed source detection.
 
+## Visit stacks (main viewer mode)
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.audit_targets
+.\.venv\Scripts\python.exe -m scripts.prepare_stack --target wise-0855 --detector D6
+```
+
+SPHEREx observes a position in bursts (visits) about six months apart. Single
+frames are too noisy to see faint targets, so `prepare_stack` downloads every
+cutout of one detector around the catalog position propagated to 2026, then
+for each visit: subtracts the ZODI model, masks unusable FLAGS, resamples
+bilinearly onto one fixed sky grid (sub-pixel accurate), removes the sky level
+and takes an inverse-variance weighted mean with per-pixel MAD sigma clipping.
+Visits with fewer than 5 usable frames are skipped as too noisy. Outputs in
+data/stacks/<target>/<detector>/: one PNG per visit, last-minus-first
+difference, annotated blink GIF and manifest.json with the catalog-predicted
+position and the measured centroid of the nearest source for each visit.
+Failed cutout downloads (IRSA often returns 503) are listed in the manifest;
+re-running fetches only the missing files.
+
+Served via `/api/stacks`, `/api/stack/{target}/{detector}`,
+`/api/stack/{target}/{detector}/frames/{index}` and `.../difference`.
+The viewer opens in this mode, with target buttons, a predicted-position ring
+and a difference toggle.
+
+First result, WISE 0855, D6 (DR1, 45 cutouts): visits of Nov 2025 (21 frames)
+and Apr 2026 (21 frames) both show a source at the predicted position, peak
+S/N about 14. Measured x shift between the visits is 0.54 px; the catalog
+proper motion predicts 0.58 px. The May 2025 visit has only 3 frames and is
+skipped. Measurements are centroids for checking, not calibrated astrometry.
+
 ## Remaining milestones
 
 1. Verify catalog positions, epochs and motion for all five targets.
