@@ -84,11 +84,21 @@ def process_frame(path, grid, size, center):
         bad, _ = unusable_mask(hdus["FLAGS"])
         aligned = subtract_background(align_bilinear(image - zodi, spatial, grid, size, ~bad))
         aligned_var = align_bilinear(variance, spatial, grid, size, ~bad)
+        saturated = align_bilinear(saturation_mask(hdus["FLAGS"]).astype(float), spatial, grid, size) > 0.25
         spectral = WCS(hdus["IMAGE"].header, fobj=hdus, key="W")
         spectral.sip = None
         x, y = spatial.world_to_pixel(center)
         wave, _ = spectral.pixel_to_world(x, y)
-    return aligned, aligned_var, float(wave.to_value("um"))
+    return aligned, aligned_var, float(wave.to_value("um")), saturated
+
+
+def saturation_mask(flags_hdu):
+    """Pixels the detector flagged as saturated (bright star cores)."""
+    bits = 0
+    for key in flags_hdu.header:
+        if key.startswith("MSKN") and flags_hdu.header[key] in {"OVERFLOW", "SUR_ERROR"}:
+            bits |= 1 << int(key[4:])
+    return (flags_hdu.data.astype(np.int64) & bits) != 0
 
 
 def stretch(array, low, high):
@@ -96,9 +106,12 @@ def stretch(array, low, high):
     return np.uint8(np.nan_to_num(scaled) * 255)
 
 
-def to_image(pixels, invalid):
+def to_image(pixels, invalid, saturated=None, saturated_value=255):
     rgb = np.stack([pixels] * 3, axis=-1)
     rgb[invalid] = INVALID_RGB
+    if saturated is not None:
+        # Masked because the star is too bright: draw as saturated, not as missing data.
+        rgb[invalid & saturated] = saturated_value
     # Row 0 of the grid is south; flip so north is up (east is already left).
     return Image.fromarray(np.flipud(rgb)).resize(
         (pixels.shape[1] * SCALE, pixels.shape[0] * SCALE), Image.Resampling.NEAREST)
@@ -131,14 +144,15 @@ def main():
     frames = []
     for row, path, url in sorted(downloaded, key=lambda item: item[0]["t_min"]):
         try:
-            aligned, variance, wave = process_frame(path, grid, size, center)
+            aligned, variance, wave, saturated = process_frame(path, grid, size, center)
         except Exception as error:
             failed.append({"url": url, "error": f"{type(error).__name__}: {error}"})
             continue
         if np.isfinite(aligned).mean() < 0.2:
             failed.append({"url": url, "error": "less than 20% of the grid covered"})
             continue
-        frames.append({"row": row, "url": url, "data": aligned, "variance": variance, "wave": wave})
+        frames.append({"row": row, "url": url, "data": aligned, "variance": variance, "wave": wave,
+                       "saturated": saturated})
     if not frames:
         raise SystemExit("No usable frames")
 
@@ -160,6 +174,7 @@ def main():
                               float(catalog["pmdec"]), 2000.0, float(mean_time.jyear))
         px, py = grid.world_to_pixel(SkyCoord(predicted["ra_deg"], predicted["dec_deg"], unit="deg"))
         epochs.append({"stack": stacked, "used": used, "group": group, "times": times, "waves": waves,
+                       "saturated": np.logical_or.reduce([f["saturated"] for f in group]),
                        "mean_time": mean_time, "predicted": predicted, "pixel": (float(px), float(py)),
                        "measured": measure_source(stacked, float(px), float(py))})
     if not epochs:
@@ -177,7 +192,7 @@ def main():
     manifest_frames, annotated = [], []
     for index, epoch in enumerate(epochs):
         invalid = ~np.isfinite(epoch["stack"])
-        image = to_image(stretch(epoch["stack"], low, high), invalid)
+        image = to_image(stretch(epoch["stack"], low, high), invalid, epoch["saturated"])
         image.save(output / f"{index}.png")
         px, py = epoch["pixel"]
         cx, cy = (px + 0.5) * SCALE, (size - py - 0.5) * SCALE  # display coordinates (flipped)
@@ -217,7 +232,8 @@ def main():
     difference = epochs[-1]["stack"] - epochs[0]["stack"]
     limit = float(np.nanpercentile(np.abs(difference[common]), 99.5)) or 1.0
     diff_pixels = np.uint8(np.clip(127.5 + 127.5 * difference / limit, 0, 255))
-    to_image(diff_pixels, ~common).save(output / "difference.png")
+    any_saturated = epochs[0]["saturated"] | epochs[-1]["saturated"]
+    to_image(diff_pixels, ~common, any_saturated, saturated_value=128).save(output / "difference.png")
 
     manifest = {
         "kind": "epoch_stack",
@@ -244,6 +260,8 @@ def main():
         "warnings": [
             "Each visit stack mixes the wavelengths of one detector band; brightness changes can be spectral.",
             "Predicted positions use catalog proper motion only (no parallax or orbital motion).",
+            "Saturated star cores (OVERFLOW/SUR_ERROR flags) are excluded from the data and drawn white; "
+            "centroids of saturated stars are biased.",
             "Stacks are for visual inspection; no PSF matching or calibrated photometry.",
         ],
     }
