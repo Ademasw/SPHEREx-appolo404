@@ -273,7 +273,17 @@ def process_frame(path, grid, size, center, table, background="model", clean=Fal
         if zodi.shape != image.shape:
             raise ValueError("ZODI shape differs from IMAGE")
         variance = hdus["VARIANCE"].data.astype(float)
+        if variance.shape != image.shape:
+            raise ValueError('VARIANCE shape differs from IMAGE')
         spatial = WCS(hdus["IMAGE"].header, fobj=hdus)
+        height, width = image.shape
+        test_x, test_y = np.array([0, width-1, width-1, 0, width/2]), np.array([0, 0, height-1, height-1, height/2])
+        image_sky = spatial.pixel_to_world(test_x, test_y)
+        for extension in ('VARIANCE', 'ZODI') if background == 'model' else ('VARIANCE',):
+            other = WCS(hdus[extension].header, fobj=hdus).pixel_to_world(test_x, test_y)
+            separation = image_sky.separation(other).arcsec
+            if not np.isfinite(separation).all() or np.max(separation) > .01:
+                raise ValueError(f'{extension} WCS differs from IMAGE')
         bad, used = unusable_mask(hdus["FLAGS"], clean=clean)
         unit = hdus["IMAGE"].header.get("BUNIT", "").strip()
         if not unit or not u.Unit(unit).is_equivalent(u.MJy / u.sr):
@@ -515,7 +525,11 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
         np.savez_compressed(out / "frames" / f"{index}.npz", data=frame["data"].astype(np.float32),
                             variance=frame["variance"].astype(np.float32), saturated=frame["saturated"],
                             wavelength_um=frame["wave_map"].astype(np.float32), bandwidth_um=frame["bandwidth_map"].astype(np.float32),
-                            flags=np.nan_to_num(frame["raw_flags"]).astype(np.int64), flags_covered=np.isfinite(frame["raw_flags"]), mask=frame["mask"])
+                            flags=np.nan_to_num(frame["raw_flags"]).astype(np.int64), flags_covered=np.isfinite(frame["raw_flags"]), mask=frame["mask"],
+                            metadata_json=np.asarray(json.dumps({'obs_id':frame['row']['obs_id'],'collection':frame['row']['collection'],
+                                'grid_header':dict(grid.to_header()),'unit':'MJy/sr','variance_unit':'(MJy/sr)^2',
+                                'flag_definitions':frame['flag_definitions'],'excluded_flags':frame['mask_flags'],
+                                'background':background,'algorithm_version':ALGORITHM_VERSION})))
         when = Time(frame["row"]["t_min"], format="mjd")
         guess = predicted(target, when, grid)
         frame_items.append({
@@ -613,8 +627,8 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
             "uncertainty_limit": "Diagonal variance uses squared interpolation weights; neighboring output pixels remain correlated. PSF and background uncertainty are not included.",
             "steps": ["image part of each IRSA cutout only (no PSF table); if the cutout service is busy, "
                       "the same pixels are read from NASA's public cloud copy",
-                      "IMAGE minus supplied ZODI model", "unusable FLAGS masked, saturated cores marked",
-                      "bilinear resampling onto a fixed sky grid", "sky level (sigma-clipped median) removed",
+                      "IMAGE minus supplied ZODI model" if background == 'model' else "calibrated IMAGE without ZODI subtraction", "unusable FLAGS masked, saturated cores marked",
+                      "bilinear resampling onto a fixed sky grid", "sky level (sigma-clipped median) removed" if background != 'none' else "sky background retained",
                       "visit stack: inverse-variance weighted mean with per-pixel MAD sigma clipping"],
             "frame_display": {"low": f_low, "high": f_high},
             "frames_available": available, "frames_requested": len(rows),

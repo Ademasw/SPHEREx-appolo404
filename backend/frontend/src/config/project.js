@@ -4,7 +4,7 @@
  * sidebar and landing page at once.
  */
 export const PROJECT = {
-  name: 'Project Name', // e.g. "Planet X Hunter"
+  name: 'Apollo 404',
   team: 'Appolo 404', // team name shown next to the logo
   challenge: 'NASA Space Apps Challenge',
 };

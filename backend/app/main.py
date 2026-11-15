@@ -1,6 +1,8 @@
 import json
 import math
 import re
+import os
+from urllib.parse import urlsplit
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Response
@@ -16,6 +18,7 @@ from app.moving import archive_matches, horizons_ephemeris
 from app.gaia import match as gaia_match
 from app.inspector import coverage, inspect_pixel, aperture_spectrum, spectral_band, band_fits
 from app.catalogs import overlay as catalog_overlay, CatalogError
+from app.releases import RELEASES
 
 app = FastAPI(title="Apollo 404 — SPHEREx", version="0.1.0")
 app.include_router(cloud_jobs_router)  # teammate's cloud-based /api/jobs search
@@ -329,7 +332,7 @@ def moving_ephemeris(target: str = "C/2025 N1", start: str = "2025-12-08T00:00:0
 @app.get("/api/moving/coverage")
 def moving_coverage(target: str = "C/2025 N1", start: str = "2025-12-08T00:00:00Z",
                     stop: str = "2025-12-16T00:00:00Z", step: str = "1d", release: str = "dr1"):
-    if release not in {"dr1", "qr3"}:
+    if f"spherex_{release}" not in RELEASES:
         raise HTTPException(400, "release must be dr1 or qr3")
     try:
         points = horizons_ephemeris(target, start, stop, step)
@@ -438,6 +441,17 @@ def targets():
 # Build before starting FastAPI to serve UI and API from the same origin.
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 if FRONTEND.is_dir():
+    @app.get('/embed', include_in_schema=False)
+    def embed_page():
+        origins = []
+        for origin in os.environ.get('SPHEREX_EMBED_ORIGINS', '').split(','):
+            origin = origin.strip()
+            parsed = urlsplit(origin)
+            if parsed.scheme in ('https', 'http') and parsed.netloc and not parsed.path and not parsed.query and not parsed.fragment and not parsed.username and not parsed.password:
+                origins.append(origin)
+        return FileResponse(FRONTEND / 'legacy.html', media_type='text/html',
+                            headers={'Content-Security-Policy': "frame-ancestors 'self' " + ' '.join(origins)})
+
     @app.get("/dashboard", include_in_schema=False)
     @app.get("/dashboard/advanced", include_in_schema=False)
     @app.get("/dashboard/player", include_in_schema=False)

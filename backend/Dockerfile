@@ -2,7 +2,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
@@ -14,13 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-lock.txt .
+RUN pip install --no-cache-dir -r requirements-lock.txt
 
 # Copy application backend code, data, and scripts
 COPY app/ ./app
 COPY scripts/ ./scripts
-COPY data/ ./data
+RUN mkdir -p data
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 ENV PYTHONUNBUFFERED=1

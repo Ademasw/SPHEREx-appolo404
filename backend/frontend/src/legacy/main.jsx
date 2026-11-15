@@ -6,7 +6,13 @@ import './purple-theme.css';
 import { parseViewerQuery, updateViewerQuery } from '../services/viewerQuery.js';
 
 // Presentation-only portal: the same controls keep their original handlers/state.
-const controlHost = window.parent !== window ? window.parent.document.getElementById('advanced-controls') : null;
+let controlHost = null;
+try { controlHost = window.parent !== window ? window.parent.document.getElementById('advanced-controls') : null; }
+catch { /* An external embed cannot access the parent's document. */ }
+if (window.location.pathname === '/embed') {
+  document.documentElement.classList.add('compact-embed');
+  if (new URLSearchParams(location.search).get('controls') === 'false') document.documentElement.classList.add('embed-no-controls');
+}
 let controlMount = null;
 if (controlHost) {
   const shadow = controlHost.shadowRoot || controlHost.attachShadow({ mode: 'open' });
@@ -260,7 +266,7 @@ function App() {
           {manifest && <a className="source-link" href="https://irsa.ipac.caltech.edu/applications/spherex" target="_blank" rel="noreferrer">IRSA SPHEREx Data Explorer ↗</a>}
         </aside>
       </section>
-      <div className="footnotes"><p><span>↳</span> North up · east left · one brightness scale per mode · saturated star cores drawn white</p><p>NASA/IPAC IRSA · SPHEREx DR1 + QR3 <span> / </span> Apollo 404</p></div>
+      <div className="footnotes"><p><span>↳</span> North up · east left · one brightness scale per mode · saturated star cores drawn white</p><p>NASA/IPAC IRSA · {manifest?.archive?.collections?.join(' + ') || 'SPHEREx'} <span> / </span> Apollo 404</p></div>
       {manifest && <details className="processing"><summary>How these images are made</summary><ul>{manifest.processing.steps.map(note => <li key={note}>{note}</li>)}{manifest.warnings.map(note => <li key={note}>{note}</li>)}</ul><p>Display controls change only the picture, never the measurements.</p></details>}
     </main><footer><span className="brand small">✳ APOLLO 404</span><span>A little closer to the unknown.</span><span>Built for discovery.</span></footer>
   </div>;

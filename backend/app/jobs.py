@@ -39,7 +39,13 @@ class JobManager:
                      "started": time.time(), "error": None, "finished": None}
             self._jobs[job_id] = state
         self._pool.submit(self._run, state, ra, dec, detector, fov, target, background, clean, smooth, refresh)
-        return self._public(state)
+        public = self._public(state)
+        if public['status'] == 'done':
+            manifest = pipeline.load(ra, dec, detector, fov, background, clean, smooth)
+            if manifest:
+                return {'status': 'done', 'manifest': manifest}
+            public['status'] = 'running'  # poll once more; never claim a result without its manifest
+        return public
 
     def _run(self, state, ra, dec, detector, fov, target, background="model", clean=False, smooth=True, refresh=False):
         def progress(stage, done, total):

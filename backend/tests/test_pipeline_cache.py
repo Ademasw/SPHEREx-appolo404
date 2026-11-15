@@ -57,6 +57,46 @@ def test_failed_refresh_keeps_published_result_and_coalesces_requests(tmp_path, 
     assert manager.request(10, 0, 'D6', .1)['manifest'] == previous
 
 
+def test_fast_worker_returns_manifest_even_if_it_finishes_before_submit_returns(monkeypatch):
+    published=[]
+    monkeypatch.setattr(pipeline,'load',lambda *args:published[0] if published else None)
+    monkeypatch.setattr(pipeline,'run',lambda *args,**kwargs:published.append({'frames':[]}))
+    manager=JobManager(workers=1)
+    manager._pool.shutdown()
+    class ImmediatePool:
+        def submit(self, function, *args):
+            function(*args)
+    manager._pool=ImmediatePool()
+    assert manager.request(10,0,'D6',.1)=={'status':'done','manifest':{'frames':[]}}
+
+
+def test_render_failure_does_not_modify_published_generation(tmp_path, monkeypatch):
+    import numpy as np
+    from app.preview import make_grid
+    monkeypatch.setattr(pipeline,'SEQUENCES',tmp_path)
+    root=pipeline.output_dir(10,0,'D6',.05)
+    root.mkdir(parents=True)
+    (root/'manifest.json').write_text('{"generation":"'+'a'*32+'"}')
+    previous=(root/'generations'/('a'*32)/'frames')
+    previous.mkdir(parents=True)
+    (previous/'0.png').write_bytes(b'previous image')
+    row={'obs_id':'test','detector':'D6','t_min':60000.,'collection':'spherex_dr1'}
+    monkeypatch.setattr(pipeline,'query_observations',lambda *args,**kwargs:{'observations':[row],'retrieved_at':'2026-01-01'})
+    monkeypatch.setattr(pipeline,'download_all',lambda *args:([(row,'url',tmp_path/'input')],[],{}))
+    monkeypatch.setattr(pipeline,'wavetable',lambda *args:None)
+    _,size=make_grid(10,0,.05)
+    data=np.ones((size,size))
+    flags=np.zeros((size,size),dtype=bool)
+    monkeypatch.setattr(pipeline,'process_frame',lambda *args:(data,data,flags,flags,4.,.1,0.,0.,['NONFUNC'],data*4,data*.1,data*0,{'MSKN0006':'NONFUNC'}))
+    def broken_render(*args,**kwargs):
+        raise OSError('disk full')
+    monkeypatch.setattr(pipeline,'render',broken_render)
+    with pytest.raises(OSError,match='disk full'):
+        pipeline.run(10,0,'D6',.05,refresh=True)
+    assert (previous/'0.png').read_bytes()==b'previous image'
+    assert json.loads((root/'manifest.json').read_text())['generation']=='a'*32
+
+
 def test_published_generation_is_resolved_without_touching_legacy_data(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, 'SEQUENCES', tmp_path)
     root = tmp_path / 'key' / 'D6'

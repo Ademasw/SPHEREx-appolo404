@@ -9,6 +9,7 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astroquery.ipac.irsa import Irsa
+from app.releases import RELEASES
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,7 +19,7 @@ def search(ra: float, dec: float, release: str = "dr1") -> dict:
         raise ValueError("RA must be finite and in [0, 360)")
     if not (math.isfinite(dec) and -90 <= dec <= 90):
         raise ValueError("Dec must be finite and in [-90, 90]")
-    if release not in {"dr1", "qr3"}:
+    if f"spherex_{release}" not in RELEASES:
         raise ValueError("Release must be dr1 or qr3")
     Irsa.TIMEOUT = 120
     rows = Irsa.query_sia(

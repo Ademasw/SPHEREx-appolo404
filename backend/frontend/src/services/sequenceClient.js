@@ -30,7 +30,10 @@ export async function loadSequence(params, { signal, base = '', fetchImpl = fetc
    signal?.throwIfAborted();
    const state = await request(`/api/sequence${force ? '/refresh' : ''}?${query}`, signal, base, fetchImpl, force ? 'POST' : 'GET');
    force = false;
-   if (state.status === 'done') { states.push(state); break; }
+   if (state.status === 'done') {
+    if (!state.manifest?.query) throw new Error('The server marked processing complete without a valid manifest.');
+    states.push(state); break;
+   }
    if (state.status === 'error') throw new Error(state.error || 'Processing failed');
    if (!['queued', 'running'].includes(state.status)) throw new Error('Unexpected processing state returned by server.');
    if (Date.now() > deadline) throw new Error('Processing is taking longer than 20 minutes. Submit again to check the cached job.');

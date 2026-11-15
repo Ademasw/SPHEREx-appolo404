@@ -18,3 +18,11 @@ def test_both_frontends_and_assets_share_api_origin():
     assert client.get('/api/health').json()['status'] == 'ok'
     assert client.get('/api/sequence').status_code == 400
     assert client.get('/api/not-a-real-endpoint').status_code == 404
+
+
+@pytest.mark.skipif(not (Path(__file__).parents[1] / 'frontend/dist/legacy.html').exists(), reason='Build frontend first')
+def test_embed_has_explicit_frame_ancestors_allowlist(monkeypatch):
+    monkeypatch.setenv('SPHEREX_EMBED_ORIGINS','https://example.org,https://bad.example/path')
+    response=TestClient(app).get('/embed?ra=0&dec=0&controls=false')
+    assert response.status_code==200
+    assert response.headers['content-security-policy']=="frame-ancestors 'self' https://example.org"

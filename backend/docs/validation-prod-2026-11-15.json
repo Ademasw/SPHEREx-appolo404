@@ -1,0 +1,362 @@
+{
+  "query": {
+    "ra_deg": 133.7598,
+    "dec_deg": -7.2422,
+    "detector": "D6",
+    "fov_deg": 0.05,
+    "key": "133.7598_-7.2422_0.05_vdd4591f799e4",
+    "background": "model",
+    "clean_mask": false,
+    "smooth_display": true
+  },
+  "archive": {
+    "collections": [
+      "spherex_dr1",
+      "spherex_qr3"
+    ],
+    "releases": [
+      {
+        "name": "SPHEREx DR1",
+        "schema": "dr1-qr3",
+        "doi": "10.26131/IRSA678",
+        "source": "https://irsa.ipac.caltech.edu/data/SPHEREx/docs/overview_dr1.html"
+      },
+      {
+        "name": "SPHEREx QR3",
+        "schema": "dr1-qr3",
+        "doi": null,
+        "source": "https://irsa.ipac.caltech.edu/data/SPHEREx/docs/overview.html"
+      }
+    ],
+    "retrieved_at": "2026-11-15T04:23:47.965128+00:00",
+    "observations_by_detector": {
+      "D1": 37,
+      "D2": 48,
+      "D3": 45,
+      "D4": 36,
+      "D5": 48,
+      "D6": 45
+    }
+  },
+  "created_at": "2026-11-15T04:23:52.900788+00:00",
+  "algorithm_version": "sequence-3",
+  "generation": "c9541cc94bdd499fa3139f63d0828340",
+  "units": "MJy/sr",
+  "frames": [
+    {
+      "obs_id": "2025W19_1B_0116_1",
+      "time_utc": "2025-05-05T16:48:02.419",
+      "release": "DR1",
+      "wavelength_um": 4.967349377520205,
+      "bandwidth_um": 0.037187025574978605,
+      "usable_grid_fraction": 0.8244444444444444
+    },
+    {
+      "obs_id": "2025W19_1B_0116_2",
+      "time_utc": "2025-05-05T16:50:11.414",
+      "release": "DR1",
+      "wavelength_um": 5.003412170984203,
+      "bandwidth_um": 0.03758080416775338,
+      "usable_grid_fraction": 0.8211111111111111
+    },
+    {
+      "obs_id": "2025W19_1B_0138_1",
+      "time_utc": "2025-05-05T20:01:35.443",
+      "release": "DR1",
+      "wavelength_um": 4.859845633369318,
+      "bandwidth_um": 0.03793287002174227,
+      "usable_grid_fraction": 0.8177777777777778
+    },
+    {
+      "obs_id": "2025W46_1A_0075_4",
+      "time_utc": "2025-11-10T07:07:24.125",
+      "release": "DR1",
+      "wavelength_um": 4.4178191357359475,
+      "bandwidth_um": 0.03724724065305192,
+      "usable_grid_fraction": 0.8166666666666667
+    },
+    {
+      "obs_id": "2025W46_1A_0076_1",
+      "time_utc": "2025-11-10T07:09:54.547",
+      "release": "DR1",
+      "wavelength_um": 4.449335699285974,
+      "bandwidth_um": 0.03656627693087324,
+      "usable_grid_fraction": 0.8211111111111111
+    },
+    {
+      "obs_id": "2025W46_1A_0076_3",
+      "time_utc": "2025-11-10T07:14:12.451",
+      "release": "DR1",
+      "wavelength_um": 4.513886251616558,
+      "bandwidth_um": 0.03591513820389739,
+      "usable_grid_fraction": 0.82
+    },
+    {
+      "obs_id": "2025W46_1A_0090_1",
+      "time_utc": "2025-11-10T08:45:16.646",
+      "release": "DR1",
+      "wavelength_um": 4.546308713228455,
+      "bandwidth_um": 0.03581285856449865,
+      "usable_grid_fraction": 0.7955555555555556
+    },
+    {
+      "obs_id": "2025W46_1A_0090_2",
+      "time_utc": "2025-11-10T08:47:25.555",
+      "release": "DR1",
+      "wavelength_um": 4.57967638596017,
+      "bandwidth_um": 0.03606865322660452,
+      "usable_grid_fraction": 0.8055555555555556
+    },
+    {
+      "obs_id": "2025W46_1A_0238_1",
+      "time_utc": "2025-11-10T23:26:52.022",
+      "release": "DR1",
+      "wavelength_um": 4.633686406313444,
+      "bandwidth_um": 0.03658004637016143,
+      "usable_grid_fraction": 0.9911111111111112
+    },
+    {
+      "obs_id": "2025W46_1A_0238_2",
+      "time_utc": "2025-11-10T23:29:01.018",
+      "release": "DR1",
+      "wavelength_um": 4.667800519815108,
+      "bandwidth_um": 0.036698545439802756,
+      "usable_grid_fraction": 0.8111111111111111
+    },
+    {
+      "obs_id": "2025W46_2A_0214_1",
+      "time_utc": "2025-11-14T12:07:21.418",
+      "release": "DR1",
+      "wavelength_um": 4.701797644773956,
+      "bandwidth_um": 0.036769458922051176,
+      "usable_grid_fraction": 0.8044444444444444
+    },
+    {
+      "obs_id": "2025W46_2A_0214_3",
+      "time_utc": "2025-11-14T12:11:39.235",
+      "release": "DR1",
+      "wavelength_um": 4.770312508998372,
+      "bandwidth_um": 0.03641980483614649,
+      "usable_grid_fraction": 0.9933333333333333
+    },
+    {
+      "obs_id": "2025W46_2A_0214_4",
+      "time_utc": "2025-11-14T12:13:48.230",
+      "release": "DR1",
+      "wavelength_um": 4.804921028742073,
+      "bandwidth_um": 0.03670003578868643,
+      "usable_grid_fraction": 0.8088888888888889
+    },
+    {
+      "obs_id": "2025W46_2A_0226_1",
+      "time_utc": "2025-11-14T13:46:55.200",
+      "release": "DR1",
+      "wavelength_um": 4.839359054360363,
+      "bandwidth_um": 0.037000490931727845,
+      "usable_grid_fraction": 0.8033333333333333
+    },
+    {
+      "obs_id": "2025W46_2A_0226_3",
+      "time_utc": "2025-11-14T13:51:13.018",
+      "release": "DR1",
+      "wavelength_um": 4.91060669743146,
+      "bandwidth_um": 0.03752745257596184,
+      "usable_grid_fraction": 0.9933333333333333
+    },
+    {
+      "obs_id": "2025W46_2A_0226_4",
+      "time_utc": "2025-11-14T13:53:22.013",
+      "release": "DR1",
+      "wavelength_um": 4.946455310901023,
+      "bandwidth_um": 0.03756283267094008,
+      "usable_grid_fraction": 0.81
+    },
+    {
+      "obs_id": "2025W46_2A_0289_1",
+      "time_utc": "2025-11-14T21:54:33.264",
+      "release": "DR1",
+      "wavelength_um": 4.982140112525958,
+      "bandwidth_um": 0.03738781587813289,
+      "usable_grid_fraction": 0.8111111111111111
+    },
+    {
+      "obs_id": "2025W50_2A_0254_1",
+      "time_utc": "2025-12-12T08:26:02.515",
+      "release": "DR1",
+      "wavelength_um": 4.701833989411526,
+      "bandwidth_um": 0.036776467381190545,
+      "usable_grid_fraction": 0.81
+    },
+    {
+      "obs_id": "2025W50_2A_0428_1",
+      "time_utc": "2025-12-13T00:41:57.091",
+      "release": "DR1",
+      "wavelength_um": 4.736049157787184,
+      "bandwidth_um": 0.03660551515587613,
+      "usable_grid_fraction": 0.8066666666666666
+    },
+    {
+      "obs_id": "2026W17_1B_0227_2",
+      "time_utc": "2026-04-21T04:45:01.411",
+      "release": "DR1",
+      "wavelength_um": 4.423782906514862,
+      "bandwidth_um": 0.03583355212436068,
+      "usable_grid_fraction": 0.8355555555555556
+    },
+    {
+      "obs_id": "2026W17_1B_0227_3",
+      "time_utc": "2026-04-21T04:47:10.320",
+      "release": "DR1",
+      "wavelength_um": 4.454981421410677,
+      "bandwidth_um": 0.03577721674399631,
+      "usable_grid_fraction": 0.9922222222222222
+    },
+    {
+      "obs_id": "2026W17_1B_0507_1",
+      "time_utc": "2026-04-22T18:10:31.066",
+      "release": "DR1",
+      "wavelength_um": 4.518669061159516,
+      "bandwidth_um": 0.035694800424946826,
+      "usable_grid_fraction": 0.8355555555555556
+    },
+    {
+      "obs_id": "2026W17_1B_0507_2",
+      "time_utc": "2026-04-22T18:12:39.974",
+      "release": "DR1",
+      "wavelength_um": 4.551011148020985,
+      "bandwidth_um": 0.03566666188030546,
+      "usable_grid_fraction": 0.8244444444444444
+    },
+    {
+      "obs_id": "2026W17_1B_0507_3",
+      "time_utc": "2026-04-22T18:14:48.883",
+      "release": "DR1",
+      "wavelength_um": 4.584125442040305,
+      "bandwidth_um": 0.03592138931251448,
+      "usable_grid_fraction": 0.8344444444444444
+    },
+    {
+      "obs_id": "2026W17_1B_0634_2",
+      "time_utc": "2026-04-23T10:30:38.794",
+      "release": "DR1",
+      "wavelength_um": 4.651091284134392,
+      "bandwidth_um": 0.03630927663732339,
+      "usable_grid_fraction": 0.8244444444444444
+    },
+    {
+      "obs_id": "2026W17_1B_0634_3",
+      "time_utc": "2026-04-23T10:32:47.789",
+      "release": "DR1",
+      "wavelength_um": 4.685148609043609,
+      "bandwidth_um": 0.03631877303305617,
+      "usable_grid_fraction": 0.8466666666666667
+    },
+    {
+      "obs_id": "2026W17_1B_0634_4",
+      "time_utc": "2026-04-23T10:34:56.698",
+      "release": "DR1",
+      "wavelength_um": 4.71917452182959,
+      "bandwidth_um": 0.036493459590461554,
+      "usable_grid_fraction": 0.8133333333333334
+    },
+    {
+      "obs_id": "2026W17_2A_0609_1",
+      "time_utc": "2026-04-26T03:39:54.662",
+      "release": "DR1",
+      "wavelength_um": 4.753121843483972,
+      "bandwidth_um": 0.03687298455953959,
+      "usable_grid_fraction": 0.82
+    },
+    {
+      "obs_id": "2026W17_2A_0609_2",
+      "time_utc": "2026-04-26T03:42:05.126",
+      "release": "DR1",
+      "wavelength_um": 4.7871637084082,
+      "bandwidth_um": 0.03707893050576983,
+      "usable_grid_fraction": 0.8233333333333334
+    },
+    {
+      "obs_id": "2026W17_2A_0692_1",
+      "time_utc": "2026-04-26T11:50:10.838",
+      "release": "DR1",
+      "wavelength_um": 4.895453816124858,
+      "bandwidth_um": 0.037395960742117394,
+      "usable_grid_fraction": 0.8211111111111111
+    },
+    {
+      "obs_id": "2026W18_2A_0065_1",
+      "time_utc": "2026-04-30T18:29:58.589",
+      "release": "DR1",
+      "wavelength_um": 4.8249136756838755,
+      "bandwidth_um": 0.037531783977041364,
+      "usable_grid_fraction": 0.8155555555555556
+    },
+    {
+      "obs_id": "2026W19_2A_0568_1",
+      "time_utc": "2026-05-08T23:38:01.363",
+      "release": "DR1",
+      "wavelength_um": 4.824957115552225,
+      "bandwidth_um": 0.03752882530381026,
+      "usable_grid_fraction": 0.8155555555555556
+    },
+    {
+      "obs_id": "2026W19_2A_0651_1",
+      "time_utc": "2026-05-09T04:39:40.867",
+      "release": "DR1",
+      "wavelength_um": 4.859713005320435,
+      "bandwidth_um": 0.037932571031056996,
+      "usable_grid_fraction": 0.8211111111111111
+    },
+    {
+      "obs_id": "2026W19_2A_0952_1",
+      "time_utc": "2026-05-09T22:23:49.171",
+      "release": "DR1",
+      "wavelength_um": 4.931240018490693,
+      "bandwidth_um": 0.036868100570760544,
+      "usable_grid_fraction": 0.9977777777777778
+    },
+    {
+      "obs_id": "2026W20_1A_0033_1",
+      "time_utc": "2026-05-11T02:18:44.640",
+      "release": "DR1",
+      "wavelength_um": 4.96730732675332,
+      "bandwidth_um": 0.03718685108712341,
+      "usable_grid_fraction": 0.82
+    }
+  ],
+  "visits": [
+    {
+      "index": 0,
+      "time_utc": "2025-11-16T07:41:41.147",
+      "time_start_utc": "2025-11-10T07:07:24.125",
+      "time_end_utc": "2025-12-13T00:41:57.091",
+      "n_frames": 16,
+      "data_url": "/api/sequence/133.7598_-7.2422_0.05_vdd4591f799e4/D6/numeric/visits/0.npz",
+      "wavelength_min_um": 4.4178191357359475,
+      "wavelength_max_um": 4.982140112525958,
+      "usable_grid_fraction": 1.0,
+      "saturated_fraction": 0.006736111111111111,
+      "image_url": "/api/sequence/133.7598_-7.2422_0.05_vdd4591f799e4/D6/visits/0.png",
+      "cutout_url": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W46_1A/l2b-v27-2026-206/6/level2_2025W46_1A_0075_4D6_spx_l2b-v27-2026-206.fits?center=133.7598%2C-7.2422d&size=0.05",
+      "predicted_position": null,
+      "measured_position": null
+    },
+    {
+      "index": 1,
+      "time_utc": "2026-04-28T02:39:26.262",
+      "time_start_utc": "2026-04-21T04:45:01.411",
+      "time_end_utc": "2026-05-11T02:18:44.640",
+      "n_frames": 16,
+      "data_url": "/api/sequence/133.7598_-7.2422_0.05_vdd4591f799e4/D6/numeric/visits/1.npz",
+      "wavelength_min_um": 4.423782906514862,
+      "wavelength_max_um": 4.96730732675332,
+      "usable_grid_fraction": 1.0,
+      "saturated_fraction": 0.006805555555555555,
+      "image_url": "/api/sequence/133.7598_-7.2422_0.05_vdd4591f799e4/D6/visits/1.png",
+      "cutout_url": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2026W17_1B/l2b-v27-2026-242/6/level2_2026W17_1B_0227_2D6_spx_l2b-v27-2026-242.fits?center=133.7598%2C-7.2422d&size=0.05",
+      "predicted_position": null,
+      "measured_position": null
+    }
+  ],
+  "failures": []
+}
