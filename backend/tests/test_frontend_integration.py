@@ -9,7 +9,7 @@ from app.main import app
 @pytest.mark.skipif(not (Path(__file__).parents[1] / 'frontend/dist/index.html').exists(), reason='Build frontend first')
 def test_both_frontends_and_assets_share_api_origin():
     client = TestClient(app)
-    for path in ('/', '/legacy.html', '/dashboard', '/dashboard/advanced?q=Barnard&det=D3&fov=0.05', '/dashboard/player', '/dashboard/compare'):
+    for path in ('/', '/legacy.html', '/dashboard', '/dashboard/advanced?q=Barnard&det=D3&fov=0.05', '/dashboard/player', '/dashboard/compare', '/dashboard/colour'):
         response = client.get(path)
         assert response.status_code == 200
         assert 'text/html' in response.headers['content-type']

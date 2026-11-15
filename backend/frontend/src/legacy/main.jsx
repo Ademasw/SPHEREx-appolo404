@@ -95,9 +95,11 @@ function App() {
     if (initial.error) { setJob({ status: 'error', error: initial.error }); return; }
     setManifest(null); setJob({ status: 'queued', stage: 'searching' }); setPlaying(false); setImageError(false);
     const params = new URLSearchParams({ q: request.q, det: request.det, fov: String(request.fov), bg: request.bg, clean: String(request.clean), smooth: String(request.smooth) });
+    let refresh = Boolean(request.refresh);
     const poll = async () => {
       try {
-        const response = await fetch(`/api/sequence?${params}`, { signal: abort.signal });
+        const response = await fetch(`/api/sequence${refresh ? '/refresh' : ''}?${params}`, { signal: abort.signal, method: refresh ? 'POST' : 'GET' });
+        refresh = false;
         const body = await response.json().catch(() => ({}));
         if (cancelled) return;
         if (response.status === 200 && body.manifest) {
@@ -198,7 +200,7 @@ function App() {
         </aside></ArchiveControls>
 
         <div className="viewer-column">
-          <div className="viewer-heading"><div><span className="live-dot"/> REAL ARCHIVE DATA <span className="release">DR1 + QR3</span></div><button className="share" onClick={share}>{copied ? 'Link copied ✓' : 'Share view ↗'}</button></div>
+          <div className="viewer-heading"><div><span className="live-dot"/> REAL ARCHIVE DATA <span className="release">{manifest?.archive?.collections?.join(' + ') || 'NASA/IPAC IRSA'}</span></div><button className="share" disabled={Boolean(job && job.status !== 'error')} onClick={() => setRequest(current => ({ ...current, refresh: Date.now() }))}>Refresh archive</button><button className="share" onClick={share}>{copied ? 'Link copied ✓' : 'Share view ↗'}</button></div>
           <div className="viewport" aria-live="polite">
             <span className="compass north">N ↑</span><span className="compass east">← E</span>
             <div className={view === 'compare' ? 'image-window wide' : 'image-window'}>

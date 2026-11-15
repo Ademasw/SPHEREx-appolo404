@@ -21,6 +21,7 @@ import os
 import threading
 import time
 import warnings
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeout
 from datetime import datetime, timezone
@@ -42,6 +43,7 @@ from app.cloudfits import cloud_url as parse_cloud_url, fetch_section
 from app.fastfits import fetch_prefix
 from app.preview import make_grid, unusable_mask
 from app.stack import align_bilinear, aperture_photometry, combine, group_epochs, measure_source, subtract_background
+from app.releases import ALGORITHM_VERSION, RELEASES, configured_collections, fingerprint
 
 warnings.simplefilter("ignore", FITSFixedWarning)
 
@@ -55,7 +57,8 @@ WAVETABLES = Path(__file__).resolve().parent / "wavetables"
 # The deep products are official SPHEREx collections and are especially useful
 # near the ecliptic poles.  Keep them in the same archive query so a normal
 # search can use them without a separate code path.
-COLLECTIONS = ("spherex_dr1", "spherex_qr3", "spherex_dr1_deep", "spherex_qr3_deep")
+COLLECTIONS = configured_collections()
+CACHE_VERSION = fingerprint(COLLECTIONS, WAVETABLES)
 DETECTORS = tuple(f"D{i}" for i in range(1, 7))
 FOVS = (0.05, 0.1, 0.2)
 MAX_PER_VISIT = 16  # enough for a clean stack; keeps downloads short
@@ -87,7 +90,7 @@ _BG_SUFFIX = {"model": "", "median": "_med", "none": "_raw"}
 
 
 def sequence_key(ra, dec, fov, background="model", clean=False, smooth=True):
-    return f"{ra:.4f}_{dec:+.4f}_{fov:g}" + _BG_SUFFIX[background] + ("_clean" if clean else "") + ("_nearest" if not smooth else "")
+    return f"{ra:.4f}_{dec:+.4f}_{fov:g}" + _BG_SUFFIX[background] + ("_clean" if clean else "") + ("_nearest" if not smooth else "") + f"_v{CACHE_VERSION}"
 
 
 def output_dir(ra, dec, detector, fov, background="model", clean=False, smooth=True):
@@ -96,13 +99,16 @@ def output_dir(ra, dec, detector, fov, background="model", clean=False, smooth=T
 
 # --------------------------------------------------------------------------- archive
 
-def query_observations(ra, dec):
+def query_observations(ra, dec, refresh=False):
     """All SPHEREx images covering the position (every detector), cached for a day."""
     METADATA.mkdir(parents=True, exist_ok=True)
     path = METADATA / f"{ra:.4f}_{dec:+.4f}.json"
-    if path.exists() and time.time() - path.stat().st_mtime < METADATA_TTL_S:
-        cached = json.loads(path.read_text(encoding="utf-8"))
-        if all("cloud_url" in o for o in cached["observations"]):
+    if not refresh and path.exists() and time.time() - path.stat().st_mtime < METADATA_TTL_S:
+        try:
+            cached = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            cached = {}
+        if cached.get("collections") == list(COLLECTIONS) and "observations" in cached and all("cloud_url" in o for o in cached["observations"]):
             return cached
     # Normally ~4 s. Under load a request can hang indefinitely (the astroquery
     # timeout does not reach the SIA call), so each attempt runs in a helper
@@ -125,9 +131,10 @@ def query_observations(ra, dec):
     seen, observations = set(), []
     for row in rows:
         band, url = str(row["energy_bandpassname"]), str(row["access_url"])
-        if not band.startswith("SPHEREx-D") or url in seen:
+        identity = (str(row["obs_id"]), band)
+        if not band.startswith("SPHEREx-D") or identity in seen:
             continue
-        seen.add(url)
+        seen.add(identity)
         observations.append({
             "obs_id": str(row["obs_id"]), "detector": band.replace("SPHEREx-", ""),
             "access_url": url, "t_min": float(row["t_min"]), "t_max": float(row["t_max"]),
@@ -138,7 +145,12 @@ def query_observations(ra, dec):
     observations.sort(key=lambda r: r["t_min"])
     result = {"ra_deg": ra, "dec_deg": dec, "retrieved_at": datetime.now(timezone.utc).isoformat(),
               "collections": list(COLLECTIONS), "observations": observations}
-    path.write_text(json.dumps(result), encoding="utf-8")
+    temporary = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps(result, allow_nan=False), encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
     return result
 
 
@@ -295,7 +307,7 @@ def predicted(target, when, grid):
 # --------------------------------------------------------------------------- rendering
 
 def stretch(array, low, high):
-    scaled = np.arcsinh(10 * np.clip((array - low) / (high - low), 0, 1)) / np.arcsinh(10)
+    scaled = np.arcsinh(10 * np.clip((array - low) / max(high - low, np.finfo(float).eps), 0, 1)) / np.arcsinh(10)
     return np.uint8(np.nan_to_num(scaled) * 255)
 
 
@@ -349,7 +361,7 @@ def render_difference(first, second, saturated, scale, path, smooth=True, bbox=N
 
 def pair_difference(key, detector, a, b):
     """PNG of visit b minus visit a for a finished sequence (cached). None if unavailable."""
-    folder = SEQUENCES / key / detector
+    folder = product_dir(key, detector)
     path = folder / "pairs" / f"{a}-{b}.png"
     if path.exists():
         return path
@@ -374,7 +386,7 @@ def display_fraction(pixel, size, bbox=None):
 # --------------------------------------------------------------------------- main entry
 
 def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, done, total: None,
-        background="model", clean=False, smooth=True):
+        background="model", clean=False, smooth=True, refresh=False):
     """Build (or rebuild) the sequence for one position and detector. Returns the manifest."""
     if detector not in DETECTORS:
         raise PipelineError("Unknown detector")
@@ -384,7 +396,7 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
         raise PipelineError("Unknown background mode")
     started = time.time()
     progress("searching", 0, 1)
-    archive = query_observations(ra, dec)
+    archive = query_observations(ra, dec, refresh=refresh)
     counts = detector_counts(archive["observations"])
     rows = [o for o in archive["observations"] if o["detector"] == detector]
     if not rows:
@@ -438,7 +450,9 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
                        "predicted": predicted(target, mean_time, grid)})
 
     progress("rendering", 0, 1)
-    out = output_dir(ra, dec, detector, fov, background, clean, smooth)
+    destination = output_dir(ra, dec, detector, fov, background, clean, smooth)
+    generation = uuid.uuid4().hex
+    out = destination / "generations" / generation
     (out / "frames").mkdir(parents=True, exist_ok=True)
     (out / "masks").mkdir(parents=True, exist_ok=True)
     (out / "visits").mkdir(parents=True, exist_ok=True)
@@ -449,6 +463,8 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
 
     # Single frames share one display scale; visit stacks (less noisy) get their own.
     frame_values = np.concatenate([f["data"][np.isfinite(f["data"]) & ~f["saturated"]] for f in frames])
+    if not frame_values.size:
+        raise PipelineError("No unsaturated pixels are available for display")
     f_low, f_high = (float(v) for v in np.percentile(frame_values, [1, 99.7]))
     if background == "none":
         # Raw sky: anchor black at zero flux so the zodiacal glow stays visible as a
@@ -533,6 +549,9 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
                       "description": "last visit minus first visit: white = brighter now, black = fainter now"}
 
     manifest = {
+        "generation": generation,
+        "cache_version": CACHE_VERSION,
+        "algorithm_version": ALGORITHM_VERSION,
         "kind": "sequence",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "query": {"ra_deg": ra, "dec_deg": dec, "detector": detector, "fov_deg": fov,
@@ -542,7 +561,7 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
         "display": {"crop": {"x0": display_crop[0], "y0": display_crop[1],
                                "x1": display_crop[2], "y1": display_crop[3]},
                      "native_size": size, "preserves_native_data": True},
-        "archive": {"collections": list(COLLECTIONS), "retrieved_at": archive["retrieved_at"],
+        "archive": {"collections": list(COLLECTIONS), "releases": [RELEASES[c] for c in COLLECTIONS], "retrieved_at": archive["retrieved_at"],
                     "observations_by_detector": counts},
         "frames": frame_items,
         "visits": visit_items,
@@ -572,6 +591,14 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
         ],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
+    # Readers discover the new generation only after every product is complete.
+    # A failed build never replaces the previous manifest or its files.
+    pointer = destination / f"manifest.{generation}.tmp"
+    try:
+        pointer.write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
+        pointer.replace(destination / "manifest.json")
+    finally:
+        pointer.unlink(missing_ok=True)
     log(f"{sequence_key(ra, dec, fov, background, clean, smooth)} {detector}: {len(frames)} frames, {len(visits)} visits, "
         f"{len(failed)} failed, {time.time() - started:.1f}s")
     progress("done", 1, 1)
@@ -580,4 +607,21 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
 
 def load(ra, dec, detector, fov, background="model", clean=False, smooth=True):
     path = output_dir(ra, dec, detector, fov, background, clean, smooth) / "manifest.json"
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        return manifest if manifest.get("cache_version") == CACHE_VERSION else None
+    except (OSError, ValueError):
+        return None
+
+
+def product_dir(key, detector):
+    """Resolve one published generation, retaining legacy directories for old URLs."""
+    root = SEQUENCES / key / detector
+    try:
+        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return root
+    generation = manifest.get("generation")
+    if generation and len(generation) == 32 and all(c in "0123456789abcdef" for c in generation):
+        return root / "generations" / generation
+    return root

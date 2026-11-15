@@ -19,7 +19,7 @@ app = FastAPI(title="Apollo 404 — SPHEREx", version="0.1.0")
 app.include_router(cloud_jobs_router)  # teammate's cloud-based /api/jobs search
 PREVIEW = Path(__file__).resolve().parents[1] / "data" / "preview"
 COMPARISON = Path(__file__).resolve().parents[1] / "data" / "comparison"
-SEQUENCE_KEY = re.compile(r"^\d{1,3}\.\d{4}_[+-]\d{1,2}\.\d{4}_0\.\d+(_med|_raw)?(_clean)?(_nearest)?$")
+SEQUENCE_KEY = re.compile(r"^\d{1,3}\.\d{4}_[+-]\d{1,2}\.\d{4}_0\.\d+(_med|_raw)?(_clean)?(_nearest)?(_v[a-f0-9]{12})?$")
 jobs = JobManager()
 
 
@@ -77,7 +77,8 @@ def gaia_endpoint(ra: float, dec: float, epoch: float = 2026.0):
 
 @app.get("/api/sequence")
 def sequence(response: Response, q: str | None = None, ra: float | None = None, dec: float | None = None,
-             det: str = "D6", fov: float = 0.1, bg: str = "model", clean: bool = False, smooth: bool = True):
+             det: str = "D6", fov: float = 0.1, bg: str = "model", clean: bool = False, smooth: bool = True,
+             refresh: bool = False):
     """Frames and visit stacks for any position. 202 with progress while processing."""
     if det not in pipeline.DETECTORS:
         raise HTTPException(400, "det must be D1 to D6")
@@ -94,6 +95,8 @@ def sequence(response: Response, q: str | None = None, ra: float | None = None, 
         request_args["clean"] = True
     if not smooth:
         request_args["smooth"] = False
+    if refresh:
+        request_args["refresh"] = True
     state = jobs.request(info["ra_deg"], info["dec_deg"], det, fov, **request_args)
     state["resolved"] = info
     if state["status"] == "error":
@@ -103,11 +106,18 @@ def sequence(response: Response, q: str | None = None, ra: float | None = None, 
     return state
 
 
+@app.post("/api/sequence/refresh")
+def refresh_sequence(response: Response, q: str | None = None, ra: float | None = None,
+                     dec: float | None = None, det: str = "D6", fov: float = 0.1,
+                     bg: str = "model", clean: bool = False, smooth: bool = True):
+    return sequence(response, q, ra, dec, det, fov, bg, clean, smooth, refresh=True)
+
+
 @app.get("/api/sequence/{key}/{det}/{kind}/{index}.png")
 def sequence_image(key: str, det: str, kind: str, index: int):
     if not SEQUENCE_KEY.match(key) or det not in pipeline.DETECTORS or kind not in ("frames", "visits", "masks") or index < 0:
         raise HTTPException(404, "Not found")
-    path = pipeline.SEQUENCES / key / det / kind / f"{index}.png"
+    path = pipeline.product_dir(key, det) / kind / f"{index}.png"
     if not path.exists():
         raise HTTPException(404, "Not found")
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
@@ -128,7 +138,7 @@ def sequence_pair(key: str, det: str, a: int, b: int):
 def sequence_matched(key: str, det: str, a: int, b: int):
     if not SEQUENCE_KEY.match(key) or det not in pipeline.DETECTORS or not (0 <= a < 16 and 0 <= b < 16):
         raise HTTPException(404, "Not found")
-    path = pipeline.SEQUENCES / key / det / "pairs" / f"matched-{a}-{b}.png"
+    path = pipeline.product_dir(key, det) / "pairs" / f"matched-{a}-{b}.png"
     if not path.exists():
         raise HTTPException(404, "Request the matched comparison product first")
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
@@ -139,7 +149,7 @@ def sequence_file(key: str, det: str, name: str):
     files = {"difference.png": "image/png", "blink.gif": "image/gif"}
     if not SEQUENCE_KEY.match(key) or det not in pipeline.DETECTORS or name not in files:
         raise HTTPException(404, "Not found")
-    path = pipeline.SEQUENCES / key / det / name
+    path = pipeline.product_dir(key, det) / name
     if not path.exists():
         raise HTTPException(404, "Not found")
     return FileResponse(path, media_type=files[name], headers={"Cache-Control": "public, max-age=86400"})
@@ -170,8 +180,9 @@ def science_matched(key: str, det: str = "D6", a: int = 0, b: int = 1):
     common = matched_range(visits[a], visits[b])
     if common is None:
         raise HTTPException(422, "The selected visits have no shared wavelength range")
-    output = pipeline.SEQUENCES / key / det / "pairs" / f"matched-{a}-{b}.png"
-    product = matched_difference(pipeline.SEQUENCES / key / det, manifest, a, b, output)
+    folder = pipeline.product_dir(key, det)
+    output = folder / "pairs" / f"matched-{a}-{b}.png"
+    product = matched_difference(folder, manifest, a, b, output)
     if product is None:
         raise HTTPException(422, "Matching wavelength frames are not available for both visits")
     return {"detector": det, "visit_a": a, "visit_b": b, "shared_wavelength": common,
@@ -182,6 +193,8 @@ def science_matched(key: str, det: str = "D6", a: int = 0, b: int = 1):
 
 @app.get("/api/science/{key}/spectrum")
 def science_spectrum(key: str):
+    if not SEQUENCE_KEY.fullmatch(key):
+        raise HTTPException(404, "Not found")
     manifests = [_manifest(key, det) for det in pipeline.DETECTORS
                  if (pipeline.SEQUENCES / key / det / "manifest.json").exists()]
     if not manifests:
@@ -192,6 +205,8 @@ def science_spectrum(key: str):
 
 @app.get("/api/science/{key}/colour/{visit}.png")
 def science_colour(key: str, visit: int):
+    if not SEQUENCE_KEY.fullmatch(key) or visit < 0:
+        raise HTTPException(404, "Not found")
     manifests = {det: _manifest(key, det) for det in pipeline.DETECTORS
                  if (pipeline.SEQUENCES / key / det / "manifest.json").exists()}
     output = pipeline.SEQUENCES / key / "colour" / f"{visit}.png"
@@ -328,6 +343,7 @@ if FRONTEND.is_dir():
     @app.get("/dashboard/advanced", include_in_schema=False)
     @app.get("/dashboard/player", include_in_schema=False)
     @app.get("/dashboard/compare", include_in_schema=False)
+    @app.get("/dashboard/colour", include_in_schema=False)
     def dashboard_page():
         return FileResponse(FRONTEND / "index.html", media_type="text/html")
 

@@ -35,7 +35,7 @@ export function parseViewerQuery(search) {
     epoch1: epoch('epoch1'), epoch2: epoch('epoch2'),
     epoch1Label: p.get('label1') || 'Epoch 1', epoch2Label: p.get('label2') || 'Epoch 2',
     displayDetector: choice('displayDet', ['1','2','3','4','5','6'], '1'),
-    playerFps: Number(choice('fps', ['1','2','3','4','5','6','7','8','9','10','12','15','24','30'], '3')) };
+    playerFps: Number(choice('fps', Array.from({length: 24}, (_, i) => String(i + 1)), '3')) };
 }
 
 export function updateViewerQuery(search, values) {

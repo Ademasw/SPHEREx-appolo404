@@ -67,6 +67,7 @@ def test_subtract_background_removes_constant_level():
 
 def test_background_modes_produce_different_keys():
     from app.pipeline import sequence_key
-    assert sequence_key(10, 0, 0.1) == "10.0000_+0.0000_0.1"
-    assert sequence_key(10, 0, 0.1, "median") == "10.0000_+0.0000_0.1_med"
-    assert sequence_key(10, 0, 0.1, "none") == "10.0000_+0.0000_0.1_raw"
+    from app.pipeline import CACHE_VERSION
+    assert sequence_key(10, 0, 0.1) == f"10.0000_+0.0000_0.1_v{CACHE_VERSION}"
+    assert sequence_key(10, 0, 0.1, "median") == f"10.0000_+0.0000_0.1_med_v{CACHE_VERSION}"
+    assert sequence_key(10, 0, 0.1, "none") == f"10.0000_+0.0000_0.1_raw_v{CACHE_VERSION}"

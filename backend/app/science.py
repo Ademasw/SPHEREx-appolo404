@@ -162,7 +162,10 @@ def colour_composite(sequence_root: Path, detector_manifests: dict, visit_index:
                     return 0
             chosen = min(visits, key=distance) if reference_time else visits[0]
             chosen_index = chosen.get("index", 0)
-            path = sequence_root / detector / "visits" / f"{chosen_index}.npz"
+            root = sequence_root / detector
+            if manifest.get("generation"):
+                root = root / "generations" / manifest["generation"]
+            path = root / "visits" / f"{chosen_index}.npz"
             if not path.exists():
                 return None
             images.append(_read_visit(path))
