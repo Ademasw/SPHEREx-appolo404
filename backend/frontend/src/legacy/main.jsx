@@ -1,3 +1,4 @@
+import SpectrumGenerator from '../components/spectrum/SpectrumGenerator.jsx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -36,7 +37,7 @@ const DETECTORS = [
   ['D1', '0.75–1.1'], ['D2', '1.1–1.6'], ['D3', '1.6–2.4'], ['D4', '2.4–3.8'], ['D5', '3.8–4.4'], ['D6', '4.4–5.0'],
 ];
 const FOVS = [[0.05, '3′'], [0.1, '6′'], [0.2, '12′']];
-const VIEWS = { visits: 'Visit stacks', compare: 'Compare 2 dates', frames: 'All frames', difference: 'Difference' };
+const VIEWS = { visits: 'Visit stacks', compare: 'Compare 2 dates', frames: 'All frames', difference: 'Difference', spectrum: 'Spectrum' };
 const COMPARE_MODES = { side: 'Side by side', blink: 'Blink A ↔ B', diff: 'Difference B − A' };
 const PIXEL_ARCSEC = 6.2;
 const STAGES = {
@@ -79,7 +80,7 @@ function App() {
   const [showB, setShowB] = useState(false);
 
   const visits = manifest?.visits || [];
-  const items = !manifest ? [] : view === 'visits' ? visits : view === 'frames' ? manifest.frames
+  const items = !manifest || view === 'spectrum' ? [] : view === 'visits' ? visits : view === 'frames' ? manifest.frames
     : view === 'compare' ? [] : manifest.difference ? [{ ...manifest.difference, kind: 'difference' }] : [];
   const a = visits.length ? Math.min(pairA ?? 0, visits.length - 1) : 0;
   const b = visits.length ? Math.min(pairB ?? visits.length - 1, visits.length - 1) : 0;
@@ -170,7 +171,7 @@ function App() {
   const counts = manifest?.archive.observations_by_detector;
   const processing = manifest?.processing;
 
-  return <div className="app">
+  return <div className={view === 'spectrum' ? 'app spectrum-mode' : 'app'}>
     <header className="topbar"><a className="brand" href="/" target="_top">SPHERA HUNTER</a><a className="docs" href="https://irsa.ipac.caltech.edu/Missions/spherex.html" target="_blank" rel="noreferrer">NASA / IPAC IRSA ↗</a></header>
     <main>
 
@@ -192,10 +193,10 @@ function App() {
           <hr/>
           <div className="section-label">02 / SHOW</div>
           <div className="mode-buttons">{Object.entries(VIEWS).map(([key, label]) => {
-            const n = !manifest ? '' : key === 'visits' ? visits.length : key === 'compare' ? (visits.length >= 2 ? 2 : 0) : key === 'frames' ? manifest.frames.length : manifest.difference ? 1 : 0;
-            return <button key={key} disabled={manifest && !n} className={view === key ? 'selected' : ''} onClick={() => choose(key)}>{label}<span>{n === '' ? '' : String(n).padStart(2, '0')}</span></button>;
+            const n = key === 'spectrum' ? '' : !manifest ? '' : key === 'visits' ? visits.length : key === 'compare' ? (visits.length >= 2 ? 2 : 0) : key === 'frames' ? manifest.frames.length : manifest.difference ? 1 : 0;
+            return <button key={key} disabled={key !== 'spectrum' && manifest && !n} className={view === key ? 'selected' : ''} onClick={() => choose(key)}>{label}<span>{n === '' ? '' : String(n).padStart(2, '0')}</span></button>;
           })}</div>
-          <p className="muted mode-note">{view === 'compare' ? 'Pick two visits. See them side by side, blink between them, or subtract them: a moving star leaves a black and white pair.' : view === 'visits' ? 'SPHEREx returns to each spot about every six months. Available selected frames of one visit are aligned and averaged. Blinking visits helps inspect changes; wavelengths and image quality can also affect the result.' : view === 'frames' ? 'Selected usable exposures in time order. Each frame can sample a different wavelength of the detector band.' : 'Last visit minus first visit. A moving star leaves a black and white pair; a variable star a single spot.'}</p>
+          <p className="muted mode-note">{view === 'spectrum' ? 'Generate a fixed-position aperture spectrum across all six detectors. Colours separate observing epochs.' : view === 'compare' ? 'Pick two visits. See them side by side, blink between them, or subtract them: a moving star leaves a black and white pair.' : view === 'visits' ? 'SPHEREx returns to each spot about every six months. Available selected frames of one visit are aligned and averaged. Blinking visits helps inspect changes; wavelengths and image quality can also affect the result.' : view === 'frames' ? 'Selected usable exposures in time order. Each frame can sample a different wavelength of the detector band.' : 'Last visit minus first visit. A moving star leaves a black and white pair; a variable star a single spot.'}</p>
           <label className="checkbox"><input type="checkbox" checked={showMarker} onChange={event => setShowMarker(event.target.checked)}/> {target ? `Propagated position · ${target.motion_source || target.source || 'catalog'}` : 'Mark search position'}</label>
           <hr/>
           <div className="section-label">03 / DISPLAY</div>
@@ -207,7 +208,8 @@ function App() {
 
         <div className="viewer-column">
           <div className="viewer-heading"><div><span className="live-dot"/> REAL ARCHIVE DATA <span className="release">{manifest?.archive?.collections?.join(' + ') || 'NASA/IPAC IRSA'}</span></div><button className="share" disabled={Boolean(job && job.status !== 'error')} onClick={() => setRequest(current => ({ ...current, refresh: Date.now() }))}>Refresh archive</button><button className="share" onClick={share}>{copied ? 'Link copied ✓' : 'Share view ↗'}</button></div>
-          <div className="viewport" aria-live="polite">
+          {view === 'spectrum' && <SpectrumGenerator query={{q:request.q,fov:request.fov,bg:request.bg,clean:request.clean,smooth:request.smooth}} name={request.q}/>}
+          <div style={{display:view === 'spectrum' ? 'none' : undefined}} className="viewport" aria-live="polite">
             <span className="compass north">N ↑</span><span className="compass east">← E</span>
             <div className={view === 'compare' ? 'image-window wide' : 'image-window'}>
               {view === 'compare' && visitA && visitB && <Compare {...{ mode: compareMode, visitA, visitB, showB, pairUrl, zoom, contrast, invert, showMarker, detector: request.det }}/>}

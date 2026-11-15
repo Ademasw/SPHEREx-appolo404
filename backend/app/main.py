@@ -128,6 +128,19 @@ def sequence(response: Response, q: str | None = None, ra: float | None = None, 
     return state
 
 
+@app.get('/api/spectrum')
+def generate_spectrum(response: Response, q: str | None = None, ra: float | None = None,
+                      dec: float | None = None, fov: float = .1, bg: str = 'model',
+                      clean: bool = False, smooth: bool = True):
+    from app.spectrum_generation import generate
+    if fov not in pipeline.FOVS or bg not in pipeline.BACKGROUNDS:
+        raise HTTPException(400, 'Invalid field of view or background')
+    result = generate(_position_from(q, ra, dec), fov, bg, clean, smooth, jobs, pipeline)
+    if result['status'] == 'running':
+        response.status_code = 202
+    return result
+
+
 @app.post("/api/sequence/refresh")
 def refresh_sequence(response: Response, q: str | None = None, ra: float | None = None,
                      dec: float | None = None, det: str = "D6", fov: float = 0.1,

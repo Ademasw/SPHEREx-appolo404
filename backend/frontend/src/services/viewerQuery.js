@@ -34,7 +34,7 @@ export function parseViewerQuery(search) {
     fov: Number(choice('fov', ['0.05','0.1','0.2'], '0.1')),
     bg: choice('bg', ['model','median','none'], 'model'),
     clean: boolean('clean', false), smooth: boolean('smooth', true),
-    view: choice('view', ['visits','frames','compare','difference'], 'visits'),
+    view: choice('view', ['visits','frames','compare','difference','spectrum'], 'visits'),
     cmp: choice('cmp', ['side','blink','diff'], 'side'),
     frame: index('frame') ?? 0, a: index('a'), b: index('b'),
     epoch1: epoch('epoch1'), epoch2: epoch('epoch2'),

@@ -1,3 +1,4 @@
+import SpectrumGenerator from '../../components/spectrum/SpectrumGenerator.jsx';
 /**
  * Shared Overview and Settings accordions shown above every dashboard view.
  *
@@ -19,81 +20,6 @@ const TARGET_PRESETS = [
  {label: 'R Draconis', coords: 'R Dra'},
 ];
 
-const VISIT_COLOURS = ['#b795ff', '#56d6c9', '#ffb45d', '#ff7395', '#79b7ff', '#d7e875'];
-
-function SpectrumPlot({ data }) {
-  const points = (data?.points || []).filter(point =>
-    Number.isFinite(Number(point.wavelength_um)) && Number.isFinite(Number(point.flux)));
-  if (points.length === 0) return <p className="text-small text-muted">No unsaturated target measurements are available in the prepared arrays, so there are no spectrum points to plot.</p>;
-  if (points.length < 2) return <p className="text-small text-muted">Only one unsaturated measurement is available; at least two are needed for a spectrum.</p>;
-
-  const visits = new Map();
-  points.forEach(point => {
-    const visit = point.visit ?? 0;
-    if (!visits.has(visit)) visits.set(visit, []);
-    visits.get(visit).push(point);
-  });
-  const groups = [...visits.entries()].sort(([a], [b]) => Number(a) - Number(b));
-  const wavelengths = points.map(point => Number(point.wavelength_um));
-  const fluxes = points.map(point => Number(point.flux));
-  const xMin = Math.min(...wavelengths);
-  const xMax = Math.max(...wavelengths);
-  const yMin = Math.min(0, ...fluxes);
-  const yMax = Math.max(...fluxes);
-  const x0 = 64, y0 = 20, width = 660, height = 205;
-  const x = value => x0 + (Number(value) - xMin) / Math.max(xMax - xMin, 1e-8) * width;
-  const y = value => y0 + height - (Number(value) - yMin) / Math.max(yMax - yMin, 1e-8) * height;
-  const dates = entries => entries.map(point => point.time_utc).filter(Boolean).sort();
-
-  return (
-    <div className="spectrum-plot">
-      <svg viewBox="0 0 760 280" role="img" aria-label="Exploratory aperture flux versus wavelength, coloured by visit">
-        {Array.from({ length: 5 }, (_, index) => {
-          const value = yMin + (yMax - yMin) * index / 4;
-          const position = y(value);
-          return <g key={`y-${index}`}>
-            <line x1={x0} x2={x0 + width} y1={position} y2={position} className="spectrum-plot__grid" />
-            <text x={x0 - 9} y={position + 4} textAnchor="end" className="spectrum-plot__tick">{Number(value.toPrecision(3)).toLocaleString()}</text>
-          </g>;
-        })}
-        {Array.from({ length: 5 }, (_, index) => {
-          const value = xMin + (xMax - xMin) * index / 4;
-          const position = x(value);
-          return <g key={`x-${index}`}>
-            <line x1={position} x2={position} y1={y0} y2={y0 + height} className="spectrum-plot__grid" />
-            <text x={position} y={y0 + height + 19} textAnchor="middle" className="spectrum-plot__tick">{value.toFixed(2)}</text>
-          </g>;
-        })}
-        <line x1={x0} x2={x0 + width} y1={y0 + height} y2={y0 + height} className="spectrum-plot__axis" />
-        <line x1={x0} x2={x0} y1={y0} y2={y0 + height} className="spectrum-plot__axis" />
-        <text x={x0 + width / 2} y="274" textAnchor="middle" className="spectrum-plot__label">Wavelength (μm)</text>
-        <text x="16" y={y0 + height / 2} textAnchor="middle" className="spectrum-plot__label" transform={`rotate(-90 16 ${y0 + height / 2})`}>Aperture flux</text>
-        {groups.map(([visit, measurements], groupIndex) => measurements.map((point, pointIndex) => {
-          const px = x(point.wavelength_um);
-          const py = y(point.flux);
-          const error = Number(point.error);
-          const colour = VISIT_COLOURS[groupIndex % VISIT_COLOURS.length];
-          const tooltip = `Visit ${Number(visit) + 1} · ${point.time_utc || 'time unavailable'} · ${point.detector || 'detector'} · ${Number(point.wavelength_um).toFixed(4)} μm · flux ${Number(point.flux).toPrecision(4)}${Number.isFinite(error) ? ` ± ${error.toPrecision(3)}` : ''}`;
-          return <g key={`${visit}-${point.detector}-${point.time_utc}-${pointIndex}`}>
-            <title>{tooltip}</title>
-            {Number.isFinite(error) && <line x1={px} x2={px} y1={y(point.flux - error)} y2={y(point.flux + error)} stroke={colour} strokeOpacity="0.55" />}
-            <circle cx={px} cy={py} r="3.1" fill={colour} fillOpacity="0.82" />
-          </g>;
-        }))}
-      </svg>
-      <ul className="spectrum-plot__legend" aria-label="Visits">
-        {groups.map(([visit, measurements], index) => {
-          const firstDate = dates(measurements)[0]?.slice(0, 10);
-          return <li key={visit}>
-            <span className="spectrum-plot__swatch" style={{ backgroundColor: VISIT_COLOURS[index % VISIT_COLOURS.length] }} />
-            <span>Visit {Number(visit) + 1}{firstDate ? ` · ${firstDate}` : ''}</span>
-          </li>;
-        })}
-      </ul>
-    </div>
-  );
-}
-
 export default function DashboardPanel({
   observation,
   filterConfig,
@@ -105,9 +31,6 @@ export default function DashboardPanel({
   const location = useLocation();
   const [draftFilter, setDraftFilter] = useState(filterConfig);
   const [draftSettings, setDraftSettings] = useState(settingsConfig);
-  const [spectrumData, setSpectrumData] = useState(null);
-  const [spectrumStatus, setSpectrumStatus] = useState('loading');
-
   useEffect(() => {
     setDraftFilter(filterConfig);
   }, [filterConfig]);
@@ -115,24 +38,6 @@ export default function DashboardPanel({
   useEffect(() => {
     setDraftSettings(settingsConfig);
   }, [settingsConfig]);
-
-  useEffect(() => {
-    const endpoint = observation.science?.spectrumUrl;
-    if (!endpoint) { setSpectrumData(null); setSpectrumStatus('unavailable'); return undefined; }
-    let cancelled = false;
-    setSpectrumData(null);
-    setSpectrumStatus('loading');
-    fetch(endpoint).then(response => response.ok ? response.json() : null)
-      .then(data => {
-        if (!cancelled) {
-          setSpectrumData(data);
-          setSpectrumStatus(data ? 'ready' : 'unavailable');
-        }
-      }).catch(() => {
-        if (!cancelled) { setSpectrumData(null); setSpectrumStatus('unavailable'); }
-      });
-    return () => { cancelled = true; };
-  }, [observation.science?.spectrumUrl]);
 
   // Apply filter changes immediately so the ON/OFF state is always live everywhere.
   const updateFilter = (patch) => {
@@ -185,10 +90,7 @@ export default function DashboardPanel({
                   </div>
                   <span className="science-products__badge">Exploratory</span>
                 </div>
-                {spectrumStatus === 'loading' ? <p className="text-small text-muted">Loading measurements…</p>
-                  : spectrumStatus === 'ready' ? <SpectrumPlot data={spectrumData} />
-                    : <p className="text-small text-muted">Spectrum data could not be loaded for this observation.</p>}
-                <p className="text-caption text-muted">Arrays: {spectrumData?.detectors?.join(' · ') || '—'}. Simple aperture flux with variance-based errors; not calibrated flux. Points at saturated targets are omitted.</p>
+                <SpectrumGenerator name={observation.coordinates} query={{q:observation.coordinates,fov:Number(settingsConfig.fovArcmin)/60,bg:filterConfig.background || (filterConfig.enabled ? 'model' : 'none'),clean:settingsConfig.cleanMask,smooth:settingsConfig.smoothDisplay}}/>
                 <div className="science-products__actions">
                   {observation.science.colourUrl ? (
                     location.pathname === ROUTES.colour
