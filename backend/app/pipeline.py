@@ -41,7 +41,7 @@ from PIL import Image, ImageDraw
 from app.astrometry import propagate
 from app.cloudfits import cloud_url as parse_cloud_url, fetch_section
 from app.fastfits import fetch_prefix
-from app.preview import make_grid, unusable_mask
+from app.preview import make_grid, unusable_mask, align_nearest
 from app.stack import align_bilinear, aperture_photometry, combine, group_epochs, measure_source, subtract_background
 from app.releases import ALGORITHM_VERSION, RELEASES, configured_collections, fingerprint
 
@@ -99,10 +99,10 @@ def output_dir(ra, dec, detector, fov, background="model", clean=False, smooth=T
 
 # --------------------------------------------------------------------------- archive
 
-def query_observations(ra, dec, refresh=False):
+def query_observations(ra, dec, fov=.1, refresh=False):
     """All SPHEREx images covering the position (every detector), cached for a day."""
     METADATA.mkdir(parents=True, exist_ok=True)
-    path = METADATA / f"{ra:.4f}_{dec:+.4f}.json"
+    path = METADATA / f"{ra:.4f}_{dec:+.4f}_{fov:g}_{CACHE_VERSION}.json"
     if not refresh and path.exists() and time.time() - path.stat().st_mtime < METADATA_TTL_S:
         try:
             cached = json.loads(path.read_text(encoding="utf-8"))
@@ -118,7 +118,11 @@ def query_observations(ra, dec, refresh=False):
     for attempt in range(4):
         started = time.time()
         try:
-            rows = _SEARCH_POOL.submit(Irsa.query_sia, pos=(SkyCoord(ra, dec, unit="deg"), 1 * u.arcsec),
+            grid, size = make_grid(ra, dec, fov_deg=fov)
+            center = SkyCoord(ra, dec, unit="deg")
+            corners = grid.pixel_to_world(np.array([-.5, size-.5, size-.5, -.5]), np.array([-.5, -.5, size-.5, size-.5]))
+            radius = center.separation(corners).max()
+            rows = _SEARCH_POOL.submit(Irsa.query_sia, pos=(center, radius),
                                        collection=list(COLLECTIONS)).result(timeout=SEARCH_TIMEOUT_S)
             log(f"search {ra:.4f} {dec:+.4f}: {len(rows)} images in {time.time() - started:.1f}s")
             break
@@ -271,17 +275,32 @@ def process_frame(path, grid, size, center, table, background="model", clean=Fal
         variance = hdus["VARIANCE"].data.astype(float)
         spatial = WCS(hdus["IMAGE"].header, fobj=hdus)
         bad, used = unusable_mask(hdus["FLAGS"], clean=clean)
-        sky = image - zodi if background == "model" else image
-        aligned = align_bilinear(sky, spatial, grid, size, ~bad)
+        unit = hdus["IMAGE"].header.get("BUNIT", "").strip()
+        if not unit or not u.Unit(unit).is_equivalent(u.MJy / u.sr):
+            raise ValueError(f"Unsupported IMAGE BUNIT: {unit!r}; expected surface brightness")
+        factor = u.Unit(unit).to(u.MJy / u.sr)
+        variance_unit = u.Unit(hdus["VARIANCE"].header.get("BUNIT", ""))
+        if not variance_unit.is_equivalent((u.MJy / u.sr) ** 2):
+            raise ValueError("Unsupported VARIANCE BUNIT")
+        variance_factor = variance_unit.to((u.MJy / u.sr) ** 2)
+        if background == "model":
+            zodi_unit = u.Unit(hdus["ZODI"].header.get("BUNIT", ""))
+            if not zodi_unit.is_equivalent(u.MJy / u.sr):
+                raise ValueError("Unsupported ZODI BUNIT")
+            zodi = zodi * zodi_unit.to(u.MJy / u.sr) / factor
+        good = ~bad & np.isfinite(variance) & (variance > 0)
+        sky = (image - zodi if background == "model" else image) * factor
+        aligned = align_bilinear(sky, spatial, grid, size, good)
         aligned_bad = align_bilinear(bad.astype(float), spatial, grid, size) > 0.25
         if background != "none":
             aligned = subtract_background(aligned)
-        aligned_var = align_bilinear(variance, spatial, grid, size, ~bad)
+        aligned_var = align_bilinear(variance * variance_factor, spatial, grid, size, good, variance=True)
         valid_variance = np.isfinite(aligned_var) & (aligned_var > 0)
         aligned = np.where(valid_variance, aligned, np.nan)
         saturated = align_bilinear(flagged(hdus["FLAGS"], {"OVERFLOW", "SUR_ERROR"}).astype(float),
                                    spatial, grid, size) > 0.25
         wave = bandwidth = None
+        wave_map = bandwidth_map = np.full((size, size), np.nan)
         if table is not None:
             with_table = fits.HDUList([fits.PrimaryHDU(), hdus["IMAGE"].copy(), table])
             spectral = WCS(hdus["IMAGE"].header, fobj=with_table, key="W")
@@ -289,7 +308,15 @@ def process_frame(path, grid, size, center, table, background="model", clean=Fal
             x, y = spatial.world_to_pixel(center)
             w, b = spectral.pixel_to_world(x, y)
             wave, bandwidth = float(w.to_value("um")), float(b.to_value("um"))
-    return aligned, aligned_var, saturated, aligned_bad, wave, bandwidth, float(np.mean(bad)), float(np.mean(saturated)), used
+            yy, xx = np.indices((size, size))
+            sx, sy = spatial.world_to_pixel(grid.pixel_to_world(xx, yy))
+            waves, widths = spectral.pixel_to_world(sx, sy)
+            wave_map = np.where(np.isfinite(aligned), waves.to_value("um"), np.nan)
+            bandwidth_map = np.where(np.isfinite(aligned), widths.to_value("um"), np.nan)
+        raw_flags = align_nearest(hdus["FLAGS"].data.astype(np.int64), spatial, grid, size)
+        flag_definitions = {key: str(hdus["FLAGS"].header[key]) for key in hdus["FLAGS"].header if key.startswith("MSKN")}
+    return (aligned, aligned_var, saturated, aligned_bad, wave, bandwidth, float(np.mean(bad)),
+            float(np.mean(saturated)), used, wave_map, bandwidth_map, raw_flags, flag_definitions)
 
 
 def predicted(target, when, grid):
@@ -396,7 +423,7 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
         raise PipelineError("Unknown background mode")
     started = time.time()
     progress("searching", 0, 1)
-    archive = query_observations(ra, dec, refresh=refresh)
+    archive = query_observations(ra, dec, fov, refresh=refresh)
     counts = detector_counts(archive["observations"])
     rows = [o for o in archive["observations"] if o["detector"] == detector]
     if not rows:
@@ -412,8 +439,11 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
     for count, (row, url, path) in enumerate(sorted(downloaded, key=lambda j: j[0]["t_min"]), 1):
         progress("processing", count, len(downloaded))
         try:
-            data, variance, saturated, mask, wave, bandwidth, source_mask_fraction, saturated_fraction, mask_flags = process_frame(
+            (data, variance, saturated, mask, wave, bandwidth, source_mask_fraction, saturated_fraction,
+             mask_flags, wave_map, bandwidth_map, raw_flags, flag_definitions) = process_frame(
                 path, grid, size, center, table, background, clean)
+        except ValueError as error:
+            raise PipelineError(f"Incompatible scientific metadata in {row['obs_id']}: {error}") from error
         except Exception as error:
             failed.append({"obs_id": row["obs_id"], "url": url, "error": f"{type(error).__name__}: {error}"[:200]})
             continue
@@ -424,6 +454,7 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
                        "saturated": saturated, "wave": wave, "bandwidth": bandwidth,
                        "source_mask_fraction": source_mask_fraction,
                        "saturated_fraction": saturated_fraction, "mask_flags": mask_flags})
+        frames[-1].update(wave_map=wave_map, bandwidth_map=bandwidth_map, raw_flags=raw_flags, flag_definitions=flag_definitions)
     if not frames:
         raise PipelineError("No usable frames could be downloaded; IRSA may be busy, try again shortly")
 
@@ -431,7 +462,7 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
     groups = group_epochs([f["row"]["t_min"] for f in frames])
     for visit, members in enumerate(groups):
         for i in members:
-            frames[i]["visit"] = visit
+            frames[i]["visit"] = None
     min_frames = MIN_VISIT_FRAMES if sum(len(g) >= MIN_VISIT_FRAMES for g in groups) >= 2 else 2
     visits, skipped = [], []
     for members in groups:
@@ -443,10 +474,12 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
         # Saturated cores and invalid-variance pixels are never allowed into a
         # visit stack. The original arrays remain available in frame NPZ files.
         stack_data = np.stack([np.where(f["saturated"], np.nan, f["data"]) for f in group])
-        stacked, _ = combine(stack_data, np.stack([f["variance"] for f in group]))
+        stacked, contributions = combine(stack_data, np.stack([f["variance"] for f in group]))
+        for frame in group:
+            frame["visit"] = len(visits)
         mean_time = Time(float(np.mean(times)), format="mjd")
         visits.append({"stack": stacked, "group": group, "times": times, "mean_time": mean_time,
-                       "saturated": np.logical_or.reduce([f["saturated"] for f in group]),
+                       "contributions": contributions, "saturated": np.logical_or.reduce([f["saturated"] for f in group]),
                        "predicted": predicted(target, mean_time, grid)})
 
     progress("rendering", 0, 1)
@@ -480,7 +513,9 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
         Image.fromarray(np.flipud(mask_image)).resize((mask_image.shape[1] * scale, mask_image.shape[0] * scale), Image.Resampling.NEAREST).save(
             out / "masks" / f"{index}.png")
         np.savez_compressed(out / "frames" / f"{index}.npz", data=frame["data"].astype(np.float32),
-                            variance=frame["variance"].astype(np.float32), saturated=frame["saturated"])
+                            variance=frame["variance"].astype(np.float32), saturated=frame["saturated"],
+                            wavelength_um=frame["wave_map"].astype(np.float32), bandwidth_um=frame["bandwidth_map"].astype(np.float32),
+                            flags=np.nan_to_num(frame["raw_flags"]).astype(np.int64), flags_covered=np.isfinite(frame["raw_flags"]), mask=frame["mask"])
         when = Time(frame["row"]["t_min"], format="mjd")
         guess = predicted(target, when, grid)
         frame_items.append({
@@ -491,8 +526,11 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
             "usable_grid_fraction": float(np.isfinite(frame["data"]).mean()),
             "masked_fraction": frame["source_mask_fraction"],
             "mask_flags": frame["mask_flags"],
+            "flag_definitions": frame["flag_definitions"],
+            "flag_counts_nearest_grid": {name: int(np.count_nonzero(np.nan_to_num(frame["raw_flags"]).astype(np.int64) & (1 << int(key[4:])))) for key, name in frame["flag_definitions"].items()},
+            "data_url": f"{base}/numeric/frames/{index}.npz?generation={generation}",
             "saturated_fraction": frame["saturated_fraction"],
-            "image_url": f"{base}/frames/{index}.png", "mask_url": f"{base}/masks/{index}.png", "cutout_url": frame["url"],
+            "image_url": f"{base}/frames/{index}.png?generation={generation}", "mask_url": f"{base}/masks/{index}.png?generation={generation}", "cutout_url": frame["url"],
             "predicted_position": guess and {**guess, "display_fraction": display_fraction(guess["grid_pixel"], size, display_crop)},
             "photometry": (aperture_photometry(frame["data"], frame["variance"],
                             guess["grid_pixel"]["x"], guess["grid_pixel"]["y"])
@@ -514,7 +552,7 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
             image.save(out / "visits" / f"{index}.png")
             # Kept so any two visits can be differenced on request (see pair_difference).
             np.savez_compressed(out / "visits" / f"{index}.npz", stack=visit["stack"].astype(np.float32),
-                                saturated=visit["saturated"])
+                                saturated=visit["saturated"], contributions=visit["contributions"])
             waves = [f["wave"] for f in visit["group"] if f["wave"] is not None]
             guess = visit["predicted"]
             measured = measure_source(visit["stack"], guess["grid_pixel"]["x"], guess["grid_pixel"]["y"]) if guess else None
@@ -528,11 +566,12 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
                 "time_start_utc": Time(min(visit["times"]), format="mjd").isot,
                 "time_end_utc": Time(max(visit["times"]), format="mjd").isot,
                 "n_frames": len(visit["group"]),
+                "data_url": f"{base}/numeric/visits/{index}.npz?generation={generation}",
                 "wavelength_min_um": min(waves) if waves else None,
                 "wavelength_max_um": max(waves) if waves else None,
                 "usable_grid_fraction": float(np.isfinite(visit["stack"]).mean()),
                 "saturated_fraction": float(np.mean([f["saturated_fraction"] for f in visit["group"]])) if visit["group"] else 0.0,
-                "image_url": f"{base}/visits/{index}.png",
+                "image_url": f"{base}/visits/{index}.png?generation={generation}",
                 "cutout_url": visit["group"][0]["url"],
                 "predicted_position": guess and {**guess, "display_fraction": display_fraction(guess["grid_pixel"], size, display_crop)},
                 "measured_position": measured,
@@ -570,6 +609,8 @@ def run(ra, dec, detector="D6", fov=0.1, target=None, progress=lambda stage, don
         "grid": {"size_px": size, "pixel_arcsec": 6.2, "orientation": "north up, east left",
                  "header": dict(grid.to_header())},
         "processing": {
+            "unit": "MJy/sr", "variance_unit": "(MJy/sr)^2",
+            "uncertainty_limit": "Diagonal variance uses squared interpolation weights; neighboring output pixels remain correlated. PSF and background uncertainty are not included.",
             "steps": ["image part of each IRSA cutout only (no PSF table); if the cutout service is busy, "
                       "the same pixels are read from NASA's public cloud copy",
                       "IMAGE minus supplied ZODI model", "unusable FLAGS masked, saturated cores marked",
@@ -614,9 +655,13 @@ def load(ra, dec, detector, fov, background="model", clean=False, smooth=True):
         return None
 
 
-def product_dir(key, detector):
+def product_dir(key, detector, generation=None):
     """Resolve one published generation, retaining legacy directories for old URLs."""
     root = SEQUENCES / key / detector
+    if generation is not None:
+        if len(generation) != 32 or any(c not in '0123456789abcdef' for c in generation):
+            raise PipelineError('Invalid product generation')
+        return root / 'generations' / generation
     try:
         manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):

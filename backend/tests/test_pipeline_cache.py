@@ -65,3 +65,23 @@ def test_published_generation_is_resolved_without_touching_legacy_data(tmp_path,
     generation = 'a' * 32
     (root / 'manifest.json').write_text(json.dumps({'generation': generation}))
     assert pipeline.product_dir('key', 'D6') == root / 'generations' / generation
+
+
+@pytest.mark.parametrize('ra,dec', [(0.,0.),(359.99,89.9)])
+def test_archive_queries_cover_field_and_deduplicate_observation_identity(tmp_path, monkeypatch, ra, dec):
+    from astropy.table import Table
+    monkeypatch.setattr(pipeline,'METADATA',tmp_path)
+    rows=Table(rows=[('same-id','SPHEREx-D6','https://example/one',60000.,60001.,'spherex_dr1',4e-6,5e-6),
+                     ('same-id','SPHEREx-D6','https://example/two',60000.,60001.,'spherex_qr3',4e-6,5e-6)],
+               names=['obs_id','energy_bandpassname','access_url','t_min','t_max','obs_collection','em_min','em_max'])
+    calls=[]
+    def query(**kwargs):
+        calls.append(kwargs)
+        return rows
+    monkeypatch.setattr(pipeline.Irsa,'query_sia',query)
+    result=pipeline.query_observations(ra,dec,.2)
+    assert len(result['observations'])==1
+    assert calls[0]['pos'][1].deg > .14
+    assert pipeline.query_observations(ra,dec,.2)==result
+    assert len(calls)==1
+    assert not list(tmp_path.glob('*.tmp'))

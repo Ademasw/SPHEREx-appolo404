@@ -7,7 +7,7 @@ import hashlib
 import json
 import os
 
-ALGORITHM_VERSION = "sequence-2"
+ALGORITHM_VERSION = "sequence-3"
 SOURCE = "https://irsa.ipac.caltech.edu/data/SPHEREx/docs/overview_dr1.html"
 RELEASES = {
     "spherex_dr1": {"name": "SPHEREx DR1", "schema": "dr1-qr3", "doi": "10.26131/IRSA678", "source": SOURCE},

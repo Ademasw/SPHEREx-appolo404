@@ -43,11 +43,16 @@ def unusable_mask(hdu, clean=False):
                   "CROSSTALK", "GHOST", "GHOST_FPA", "GHOST_EXT", "STREAK", "BLOOM",
                   "SNOWBALL", "HALO"}
     bits = 0
+    defined_bits = 0
     used = []
     for key in hdu.header:
+        if key.startswith('MSKN') and key[4:].isdigit():
+            defined_bits |= 1 << int(key[4:])
         if key.startswith("MSKN") and hdu.header[key] in names:
             bits |= 1 << int(key[4:])
             used.append(hdu.header[key])
     if not used:
         raise ValueError("No recognized quality flag definitions; inspect FITS before rendering")
+    if np.any(hdu.data.astype(np.int64) & ~defined_bits):
+        raise ValueError("Undefined quality bits are set; this FLAGS schema requires review")
     return (hdu.data.astype(np.int64) & bits) != 0, used

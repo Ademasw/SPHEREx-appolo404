@@ -43,6 +43,14 @@ def test_bilinear_alignment_ignores_invalid_pixels():
     assert result[3, 3] == 1
 
 
+def test_variance_uses_squared_interpolation_weights():
+    target, size = make_grid(130, -7, fov_deg=.02)
+    source = target.deepcopy()
+    source.wcs.crpix += [.5, 0]
+    result = align_bilinear(np.full((size + 4, size + 4), 4.), source, target, size, variance=True)
+    assert np.allclose(result[3, 3:8], 2.)  # .5² * 4 + .5² * 4
+
+
 def test_combine_rejects_single_frame_outlier():
     cube = np.ones((7, 4, 4))
     cube[2, 1, 1] = 1000.0  # cosmic ray in one frame

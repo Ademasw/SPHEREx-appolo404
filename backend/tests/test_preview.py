@@ -31,3 +31,13 @@ def test_known_source_flag_is_not_treated_as_bad_pixel():
     bad, names = unusable_mask(hdu)
     assert bad.tolist() == [[False, True]]
     assert names == ["NONFUNC"]
+
+
+def test_unknown_quality_bit_is_not_silently_nominal():
+    from astropy.io import fits
+    from app.preview import unusable_mask
+    import pytest
+    hdu = fits.ImageHDU(np.array([[1 << 5]], dtype=np.int32))
+    hdu.header['MSKN0006']='NONFUNC'
+    with pytest.raises(ValueError,match='Undefined quality'):
+        unusable_mask(hdu)

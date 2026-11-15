@@ -49,36 +49,79 @@ def matched_range(visit_a, visit_b):
 
 
 def matched_difference(sequence_root: Path, manifest: dict, a: int, b: int, output: Path):
-    """Difference two visits after retaining only frames in their shared range."""
+    """Diagnostic B-A with compatible local passbands and inverse variance weights.
+
+    The reference is the first usable A exposure at each grid pixel. Only
+    measurements within one quarter of the narrower local FWHM enter a stack.
+    Resampling correlations, PSF and background uncertainty remain limitations.
+    """
+    from astropy.io import fits
     visits = manifest.get("visits", [])
-    if a >= len(visits) or b >= len(visits):
+    if a < 0 or b < 0 or a == b or max(a, b) >= len(visits):
         return None
-    common = matched_range(visits[a], visits[b])
-    if common is None:
-        return None
-    arrays = {}
+    groups = {a: [], b: []}
     for item in manifest.get("frames", []):
-        wave = item.get("wavelength_um")
-        if wave is None or not common["min_um"] <= wave <= common["max_um"]:
+        visit = item.get("visit")
+        if visit not in groups:
             continue
         path = sequence_root / "frames" / f"{item['index']}.npz"
-        if path.exists():
-            with np.load(path) as data:
-                arrays.setdefault(item.get("visit"), []).append(np.array(data["data"], dtype=np.float32))
-    if not arrays.get(a) or not arrays.get(b):
+        if not path.exists():
+            continue
+        with np.load(path) as source:
+            if not {"wavelength_um", "bandwidth_um", "variance", "saturated"}.issubset(source.files):
+                continue  # old center-wavelength products require regeneration
+            groups[visit].append({name: np.array(source[name]) for name in
+                                  ("data", "variance", "saturated", "wavelength_um", "bandwidth_um")})
+    if not groups[a] or not groups[b]:
         return None
-    first, second = np.nanmean(arrays[a], axis=0), np.nanmean(arrays[b], axis=0)
+    shape = groups[a][0]["data"].shape
+    reference, width = np.full(shape, np.nan), np.full(shape, np.nan)
+    def valid(frame):
+        return (np.isfinite(frame["data"]) & np.isfinite(frame["variance"]) & (frame["variance"] > 0)
+                & ~frame["saturated"] & np.isfinite(frame["wavelength_um"])
+                & np.isfinite(frame["bandwidth_um"]) & (frame["bandwidth_um"] > 0))
+    for frame in groups[a]:
+        select = ~np.isfinite(reference) & valid(frame)
+        reference[select] = frame["wavelength_um"][select]
+        width[select] = frame["bandwidth_um"][select]
+    def stack(frames):
+        weighted, total, count = np.zeros(shape), np.zeros(shape), np.zeros(shape, dtype=np.int32)
+        for frame in frames:
+            tolerance = .25 * np.minimum(width, frame["bandwidth_um"])
+            usable = valid(frame) & (np.abs(frame["wavelength_um"] - reference) <= tolerance)
+            weight = np.divide(1., frame["variance"], out=np.zeros(shape), where=usable)
+            weighted += np.where(usable, frame["data"], 0) * weight
+            total += weight
+            count += usable
+        mean = np.divide(weighted, total, out=np.full(shape, np.nan), where=total > 0)
+        variance = np.divide(1., total, out=np.full(shape, np.nan), where=total > 0)
+        return mean, variance, count
+    first, var_a, count_a = stack(groups[a])
+    second, var_b, count_b = stack(groups[b])
     delta = second - first
     finite = np.isfinite(delta)
-    limit = float(np.nanpercentile(np.abs(delta[finite]), 99.5)) if finite.any() else 1.0
-    limit = limit or 1.0
+    if not finite.any():
+        return None
+    limit = float(np.percentile(np.abs(delta[finite]), 99.5)) or 1.
     pixels = np.uint8(np.clip(127.5 + 127.5 * np.nan_to_num(delta) / limit, 0, 255))
     rgb = np.repeat(pixels[..., None], 3, axis=-1)
     rgb[~finite] = (45, 35, 55)
     output.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(np.flipud(rgb), "RGB").save(output)
-    return {"shared_wavelength": common, "frames_a": len(arrays[a]), "frames_b": len(arrays[b]),
-            "image_url": str(output)}
+    import uuid
+    temporary = output.with_name(output.stem + '.' + uuid.uuid4().hex + '.png')
+    Image.fromarray(np.flipud(rgb)).save(temporary)
+    temporary.replace(output)
+    header = fits.Header(manifest.get("grid", {}).get("header", {}))
+    header['BUNIT'] = manifest.get("processing", {}).get("unit", 'MJy/sr')
+    header['HISTORY'] = 'Diagnostic B-A; local passband tolerance 0.25 FWHM. No PSF matching.'
+    header['VISIT_A'], header['VISIT_B'] = a, b
+    fits.HDUList([fits.PrimaryHDU(delta.astype(np.float32), header=header),
+                  fits.ImageHDU((var_a + var_b).astype(np.float32), name='VARIANCE'),
+                  fits.ImageHDU(count_a, name='COUNT_A'), fits.ImageHDU(count_b, name='COUNT_B'),
+                  fits.ImageHDU((~finite).astype(np.uint8), name='MASK'),
+                  fits.ImageHDU(reference.astype(np.float32), name='WAVELENGTH')]).writeto(output.with_suffix('.fits'), overwrite=True)
+    return {"frames_a": len(groups[a]), "frames_b": len(groups[b]),
+            "usable_grid_fraction": float(finite.mean()), "image_url": str(output)}
 
 
 def spectrum(manifests):

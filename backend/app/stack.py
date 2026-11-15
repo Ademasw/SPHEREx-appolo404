@@ -30,7 +30,7 @@ def group_epochs(times_mjd, gap_days=30.0):
     return groups
 
 
-def align_bilinear(data, source_wcs, target_wcs, size, valid=None, min_weight=0.75):
+def align_bilinear(data, source_wcs, target_wcs, size, valid=None, min_weight=0.75, variance=False):
     """Resample an image onto the target grid with bilinear interpolation.
 
     Sub-pixel accurate, unlike nearest-neighbor, which matters because the
@@ -60,9 +60,10 @@ def align_bilinear(data, source_wcs, target_wcs, size, valid=None, min_weight=0.
             values = np.full((size, size), np.nan)
             values[inside] = image[yi[inside], xi[inside]]
             ok = np.isfinite(values)
-            total += np.where(ok, w * values, 0.0)
+            total += np.where(ok, (w ** 2 if variance else w) * values, 0.0)
             weight += np.where(ok, w, 0.0)
-    return np.where(weight >= min_weight, total / np.where(weight > 0, weight, 1), np.nan)
+    denominator = np.where(weight > 0, weight, 1)
+    return np.where(weight >= min_weight, total / (denominator ** 2 if variance else denominator), np.nan)
 
 
 def subtract_background(frame):
