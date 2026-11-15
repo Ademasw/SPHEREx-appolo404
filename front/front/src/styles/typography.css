@@ -1,0 +1,165 @@
+/* ==========================================================================
+   src/styles/typography.css — SINGLE SOURCE OF TRUTH FOR ALL TEXT STYLES
+   --------------------------------------------------------------------------
+   HOW TO CHANGE FONTS GLOBALLY
+     1. Load the new font in `index.html` (Google Fonts <link>), or add a
+        local @font-face block at the top of this file.
+     2. Change the --font-* variables below.
+   Components only use the `.text-*` classes from this file (never hard-coded
+   font-family / font-size), so every change here propagates everywhere.
+   ========================================================================== */
+
+:root {
+  /* ---- Font families ---- */
+  --font-display: 'Orbitron', 'Segoe UI', system-ui, sans-serif; /* headings, brand */
+  --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; /* paragraphs, UI */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace; /* data */
+
+  /* ---- Font sizes (fluid where it helps) ---- */
+  --fs-display: clamp(2.4rem, 6.5vw, 5.25rem);
+  --fs-h1: clamp(1.6rem, 2.6vw, 2.25rem);
+  --fs-h2: clamp(1.15rem, 1.6vw, 1.4rem);
+  --fs-body-lg: clamp(1rem, 1.3vw, 1.2rem);
+  --fs-body: 1rem;
+  --fs-small: 0.875rem;
+  --fs-caption: 0.75rem;
+  --fs-button: 1rem;
+
+  /* ---- Font weights ---- */
+  --fw-light: 300;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-black: 900;
+
+  /* ---- Line heights ---- */
+  --lh-tight: 1.05;
+  --lh-snug: 1.3;
+  --lh-normal: 1.6;
+
+  /* ---- Letter spacing ---- */
+  --ls-tight: -0.01em;
+  --ls-normal: 0;
+  --ls-wide: 0.08em;
+  --ls-wider: 0.18em;
+  --ls-widest: 0.3em;
+}
+
+/* ---------------------------- Display & headings ---------------------------- */
+
+/** Huge hero title (Landing page). */
+.text-display {
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-black);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+}
+
+/** Page / section titles. */
+.text-h1 {
+  font-family: var(--font-display);
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-wide);
+}
+
+/** Panel / card titles. */
+.text-h2 {
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-wide);
+}
+
+/** Project / team name in header and sidebar. */
+.text-brand {
+  font-family: var(--font-display);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider);
+  text-transform: uppercase;
+}
+
+/* --------------------------------- Body text -------------------------------- */
+
+.text-body-lg {
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  font-weight: var(--fw-light);
+  line-height: var(--lh-normal);
+}
+
+.text-body {
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-normal);
+}
+
+.text-small {
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-normal);
+}
+
+.text-caption {
+  font-family: var(--font-body);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-snug);
+}
+
+/* --------------------------------- UI labels -------------------------------- */
+
+/** Small uppercase labels: eyebrow text, nav links, form labels. */
+.text-label {
+  font-family: var(--font-body);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wider);
+  text-transform: uppercase;
+}
+
+/** Button text. */
+.text-button {
+  font-family: var(--font-display);
+  font-size: var(--fs-button);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider);
+  text-transform: uppercase;
+}
+
+/** Numbers, coordinates, timestamps. */
+.text-mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--ls-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------- Modifiers -------------------------------- */
+/* Colour-only helpers (no font metrics) — combine with any class above. */
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-accent {
+  color: var(--color-accent);
+}
+
+/** Purple-to-white gradient fill for hero titles. */
+.text-gradient {
+  background: linear-gradient(100deg, #ffffff 10%, var(--color-accent-light) 55%, var(--color-accent) 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+

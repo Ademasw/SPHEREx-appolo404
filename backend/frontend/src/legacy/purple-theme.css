@@ -1,0 +1,73 @@
+/* Presentation only: existing archive controls, scientific images and logic unchanged. */
+:root { --line:rgba(190,160,255,.18); --muted:#a99cc8; --orange:#b18aff; background:#07020e; color:#f2edff; font-family:'DM Sans',Arial,sans-serif; }
+body { background:radial-gradient(ellipse at 85% 0, #21103c 0, transparent 45%),#07020e; }
+main { padding:0 24px; max-width:1800px; }
+.topbar { height:62px; padding:0 24px; border-color:var(--line); }
+.brand { font-size:15px; letter-spacing:3px; color:#d7c2ff; }
+.intro { padding:30px 0 24px; }
+h1 { font-size:clamp(28px,3vw,44px); letter-spacing:-1px; color:#f2edff; margin:14px 0; }
+.eyebrow,.section-label,.viewer-heading,.viewport-bottom,.coordinates span { color:#bca5e1; }
+.search,.workspace,.player,.timeline,.scrubber,.details,.sidebar { background:#10071e; border-color:var(--line); }
+.search { border-radius:18px; }
+.workspace { border-radius:18px; grid-template-columns:205px minmax(280px,1fr) 190px; }
+.viewer-column,.viewport,.coordinates,.search input { background-color:#06020d; border-color:var(--line); }
+.search input { color:#f2edff; border-radius:10px; }
+.search-row button,.player button.play { background:linear-gradient(120deg,#7c3aed,#ad79ff); color:#fff; border:0; border-radius:10px; }
+.chips button,.detectors button,.fov button,.mode-buttons button,.pick select,.speed select { color:#d7c2ff; border-color:var(--line); background:#130924; }
+.chips button.selected,.detectors button.selected,.fov button.selected,.mode-buttons button.selected,.player .segmented button.selected { background:#32204e; color:#f2eaff; border-color:#a66bff; }
+.tag,.release { color:#d7c2ff; background:#2a1742; border-color:#6f469e; }
+.marker { border-color:#c7a6ff; }
+.timeline button.active,.science-note>span,.orange { color:#c7a6ff; }
+.timeline button.active .timeline-dot,.bar>span { background:#b18aff; }
+a:hover,.reset:hover,.share:hover { color:#d7c2ff; }
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { outline:2px solid #c7a6ff; }
+@media(max-width:1100px) { .workspace { grid-template-columns:190px minmax(250px,1fr); } .details { grid-column:1/-1; border-top:1px solid var(--line); } }
+@media(max-width:720px) { main { padding:0 12px; } .workspace { grid-template-columns:1fr; } .sidebar { border-right:0; border-bottom:1px solid var(--line); } .details { grid-column:auto; } .intro { padding-top:20px; } .topbar { padding:0 12px; } }
+/* Embedded layout: region/display controls live below Advanced mode in the sidebar. */
+.archive-embedded body { background:transparent; }
+.archive-embedded .topbar { display:none; }
+.archive-embedded main { padding:0; max-width:none; }
+.archive-embedded .intro { padding:28px 0 22px; }
+.archive-embedded .search { margin:0 0 20px; }
+.archive-embedded .workspace { grid-template-columns:minmax(0,1fr) 210px; align-items:start; background:#06020d; }
+.archive-embedded .viewer-column { min-width:0; }
+.archive-embedded .details { grid-column:auto; border-top:0; min-height:100%; }
+.archive-embedded .viewport { height:clamp(380px,48vw,620px); }
+.archive-embedded .image-window { width:min(100%,560px); }
+.archive-embedded footer { display:none; }
+@media(max-width:700px) { .archive-embedded .workspace { grid-template-columns:minmax(0,1fr); } .archive-embedded .details { border-top:1px solid var(--line); } }
+.archive-embedded .image-window.wide { width:100%; max-width:none; }
+.archive-embedded .compare-grid { max-width:1200px; margin:auto; }
+
+/* Readable archive controls, also copied into the sidebar shadow root. */
+:root { font-size:18px; }
+.intro p { font-size:17px; }
+.search-row input { font-size:18px; min-height:50px; }
+button, select { min-height:44px; }
+.chips { gap:10px; }
+.chips button { padding:9px 14px; font-size:14px; }
+.detectors { gap:8px; }
+.detectors button { padding:10px 8px; min-width:0; }
+.detectors button small { opacity:.85; }
+.mode-buttons button { padding:12px; gap:8px; }
+.fov { flex-wrap:wrap; }
+.fov button { padding:6px 10px; }
+.player { flex-wrap:wrap; }
+.player button, .player button.play, .player .swap { width:44px; height:44px; }
+.player .segmented button { width:auto; height:auto; min-height:44px; }
+.viewer-heading { height:auto; min-height:64px; gap:12px; flex-wrap:wrap; padding:12px 20px; }
+.viewport-bottom { flex-wrap:wrap; gap:8px; }
+.archive-embedded .workspace { grid-template-columns:minmax(0,1fr) 260px; }
+.details { overflow-wrap:anywhere; }
+.details dl { display:block; }
+.details dt { margin-top:18px; }
+.details dd { margin:6px 0 18px; }
+@media(max-width:1000px) {
+  .archive-embedded .workspace { grid-template-columns:minmax(0,1fr); }
+  .archive-embedded .details { border-left:0; border-top:1px solid var(--line); }
+}
+@media(max-width:650px) {
+  .mode-buttons { flex-wrap:wrap; }
+  .mode-buttons button { flex:1 1 140px; }
+  .search-row { flex-direction:column; }
+}

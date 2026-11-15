@@ -1,0 +1,122 @@
+.landing {
+  position: relative;
+  min-height: 175vh;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.landing__hero {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 1240px;
+  padding: 8.5rem clamp(1rem, 3vw, 2.5rem) 5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3.25rem;
+}
+
+.landing__intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.35rem;
+  max-width: 760px;
+  text-align: center;
+}
+
+.landing__title {
+  text-shadow: 0 0 40px rgba(166, 107, 255, 0.25);
+}
+
+.landing__thanks {
+  max-width: 560px;
+}
+
+.landing__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  padding: 1rem 2.4rem;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: linear-gradient(135deg, #7b3dff, #b16cff);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: var(--shadow-glow), inset 0 0 12px rgba(255, 255, 255, 0.15);
+  transition: box-shadow var(--transition-med);
+}
+
+.landing__cta:hover {
+  box-shadow: 0 0 50px rgba(166, 107, 255, 0.65), inset 0 0 12px rgba(255, 255, 255, 0.2);
+}
+
+.landing__cta-arrow {
+  transition: transform var(--transition-fast);
+}
+
+.landing__cta:hover .landing__cta-arrow {
+  transform: translateX(4px);
+}
+
+/* ---- Aladin-style 3D Celestial Photo Globe right under the intro words ---- */
+.landing__globe-block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.landing__globe-header {
+  max-width: 720px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.landing__globe-subtitle {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+/* One continuous fade: no separate panel/background edge at the map section. */
+.landing {
+  background:linear-gradient(to bottom,
+    rgba(0,0,0,0) 0, rgba(0,0,0,0) 45vh,
+    rgba(0,0,0,.04) 60vh, rgba(0,0,0,.13) 75vh,
+    rgba(0,0,0,.30) 90vh, rgba(0,0,0,.53) 105vh,
+    rgba(0,0,0,.76) 120vh, rgba(0,0,0,.92) 135vh,
+    #000 155vh, #000 100%);
+}
+.landing > .star-field, .landing > .orbital-system {
+  height:145vh;
+  mask-image:linear-gradient(#000 0%,#000 35%,rgba(0,0,0,.7) 55%,rgba(0,0,0,.2) 78%,transparent 100%);
+}
+.landing__hero { max-width:none; padding-bottom:0; gap:0; }
+.landing__intro { min-height:calc(95vh - 8.5rem); max-width:1100px; gap:1.8rem; }
+.landing__intro, .landing__globe-header, .site-header { text-transform:uppercase; }
+.landing__title { font-size:clamp(3.6rem,7.3vw,7.5rem); line-height:1.12; }
+.landing__eyebrow { font-size:clamp(.95rem,1.2vw,1.3rem); }
+.landing__thanks { max-width:850px; font-size:clamp(1.1rem,1.6vw,1.55rem); line-height:1.75; }
+.landing__cta { font-size:clamp(1.1rem,1.5vw,1.4rem); padding:1.15rem 2.8rem; }
+.landing__globe-block { margin-top:4rem; padding-top:0; background:transparent; width:100vw; gap:1.25rem; }
+.landing__globe-header { padding:0 1.5rem; max-width:1000px; }
+.landing__globe-header .text-h1 { font-size:clamp(2rem,3.5vw,3.5rem); }
+.landing__globe-subtitle { font-size:clamp(1rem,1.3vw,1.25rem); max-width:850px; }
+.landing__globe-block .irsa-sky-map {
+  width:100%; height:min(90vw,72svh); border:0; border-radius:0;
+  box-shadow:none; background:#000; margin-bottom:6rem;
+}
+.landing__globe-block .irsa-sky-map__canvas {
+  width:min(90vw,72svh); height:100%; margin:0 auto; background:#000;
+}
+@media(max-width:600px) {
+  .landing__hero { padding-top:9rem; }
+  .landing__title { font-size:clamp(2.6rem,10vw,3.8rem); }
+  .landing__intro { min-height:85vh; }
+}

@@ -1,0 +1,306 @@
+/* ==========================================================================
+   CelestialGlobe.css — Aladin-Lite style 3D rotating sky photo globe window.
+   ========================================================================== */
+
+.aladin-shell {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 3, 22, 0.78);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65), 0 0 40px rgba(140, 75, 255, 0.16);
+}
+
+/* ---- Top Aladin toolbar ---- */
+.aladin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.85rem 1.2rem;
+  background: rgba(5, 1, 14, 0.85);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.aladin-coords {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--border);
+  color: var(--color-text);
+}
+
+.aladin-coords__badge {
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-light);
+  font-size: 0.7rem;
+}
+
+.aladin-search {
+  display: flex;
+  flex: 1;
+  max-width: 380px;
+  gap: 0.4rem;
+}
+
+.aladin-search__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--color-text);
+}
+
+.aladin-search__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.aladin-search__btn {
+  padding: 0 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  transition: background var(--transition-fast);
+}
+
+.aladin-search__btn:hover {
+  background: rgba(166, 107, 255, 0.35);
+}
+
+.aladin-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.aladin-select {
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--color-text);
+}
+
+.aladin-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--color-text-muted);
+}
+
+.aladin-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
+}
+
+/* ---- Stage: 3D Globe Canvas + Inspector ---- */
+.aladin-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  min-height: 580px;
+}
+
+.aladin-viewport {
+  position: relative;
+  width: 100%;
+  height: 580px;
+  min-height: 580px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(44, 14, 88, 0.55) 0%, rgba(8, 2, 20, 0.92) 58%, #020007 100%);
+  overflow: hidden;
+  user-select: none;
+}
+
+.aladin-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.aladin-canvas:active {
+  cursor: grabbing;
+}
+
+.aladin-controls {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.aladin-ctrl {
+  min-width: 44px;
+  height: 34px;
+  padding: 0 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(6, 2, 16, 0.82);
+  color: var(--color-text-muted);
+  backdrop-filter: blur(8px);
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+
+.aladin-ctrl:hover {
+  color: var(--color-text);
+  border-color: var(--border-strong);
+}
+
+.aladin-ctrl.is-active {
+  color: var(--color-accent-light);
+  border-color: var(--border-strong);
+  background: var(--color-accent-soft);
+}
+
+.aladin-hint {
+  position: absolute;
+  left: 1rem;
+  bottom: 0.85rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: rgba(4, 1, 12, 0.72);
+  border: 1px solid var(--border);
+  pointer-events: none;
+}
+
+/* ---- Selected Tile Inspector ---- */
+.aladin-inspector {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: rgba(8, 2, 18, 0.72);
+}
+
+.aladin-inspector__preview {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.aladin-inspector__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.aladin-inspector__tag {
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.65rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: rgba(5, 1, 14, 0.82);
+  border: 1px solid var(--border-strong);
+  font-size: 0.72rem;
+}
+
+.aladin-inspector__body {
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.aladin-inspector__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.aladin-inspector__cta {
+  margin-top: auto;
+  width: 100%;
+  text-align: center;
+}
+
+/* ---- Bottom strip of mapped photo tiles ---- */
+.aladin-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  background: rgba(5, 1, 14, 0.85);
+  overflow-x: auto;
+}
+
+.aladin-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--color-text-muted);
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+
+.aladin-chip:hover {
+  color: var(--color-text);
+  border-color: var(--border-strong);
+}
+
+.aladin-chip.is-active {
+  color: var(--color-text);
+  border-color: rgba(255, 165, 100, 0.65);
+  background: rgba(255, 154, 92, 0.16);
+}
+
+.aladin-chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.aladin-chip.is-active .aladin-chip__dot {
+  background: var(--color-highlight);
+  box-shadow: 0 0 6px var(--color-highlight);
+}
+
+@media (max-width: 960px) {
+  .aladin-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .aladin-inspector {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}
+

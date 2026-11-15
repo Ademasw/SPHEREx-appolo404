@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    restart: always
+    ports:
+      - "80:8000"
+      - "8000:8000"
+    environment:
+      - SPHEREX_SOURCE=cloud
+    volumes:
+      - ./data:/app/data
+

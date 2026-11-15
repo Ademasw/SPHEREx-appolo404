@@ -1,0 +1,13 @@
+services:
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "80:8000"
+      - "8000:8000"
+    environment:
+      - SPHEREX_SOURCE=cloud
+    volumes:
+      - ./backend/data:/app/data
