@@ -14,6 +14,8 @@ from app.cloud_jobs import router as cloud_jobs_router
 from app.science import COLOUR_PAIRS, matched_difference, matched_range, spectrum, visit_quality, colour_composite
 from app.moving import archive_matches, horizons_ephemeris
 from app.gaia import match as gaia_match
+from app.inspector import coverage, inspect_pixel, aperture_spectrum, spectral_band, band_fits
+from app.catalogs import overlay as catalog_overlay, CatalogError
 
 app = FastAPI(title="Apollo 404 — SPHEREx", version="0.1.0")
 app.include_router(cloud_jobs_router)  # teammate's cloud-based /api/jobs search
@@ -114,54 +116,141 @@ def refresh_sequence(response: Response, q: str | None = None, ra: float | None 
 
 
 @app.get("/api/sequence/{key}/{det}/{kind}/{index}.png")
-def sequence_image(key: str, det: str, kind: str, index: int):
-    if not SEQUENCE_KEY.match(key) or det not in pipeline.DETECTORS or kind not in ("frames", "visits", "masks") or index < 0:
+def sequence_image(key: str, det: str, kind: str, index: int, generation: str | None = None):
+    if not SEQUENCE_KEY.fullmatch(key) or det not in pipeline.DETECTORS or kind not in ("frames", "visits", "masks") or index < 0:
         raise HTTPException(404, "Not found")
-    path = pipeline.product_dir(key, det) / kind / f"{index}.png"
+    if generation is not None and not re.fullmatch('[a-f0-9]{32}', generation):
+        raise HTTPException(404, 'Not found')
+    path = pipeline.product_dir(key, det, generation) / kind / f"{index}.png"
     if not path.exists():
         raise HTTPException(404, "Not found")
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/sequence/{key}/{det}/pair/{a}/{b}.png")
 def sequence_pair(key: str, det: str, a: int, b: int):
     """Difference of any two visits (b minus a), rendered on first request."""
-    if not SEQUENCE_KEY.match(key) or det not in pipeline.DETECTORS or not (0 <= a < 16 and 0 <= b < 16):
+    if not SEQUENCE_KEY.fullmatch(key) or det not in pipeline.DETECTORS or not (0 <= a < 16 and 0 <= b < 16):
         raise HTTPException(404, "Not found")
     path = pipeline.pair_difference(key, det, a, b)
     if path is None:
         raise HTTPException(404, "Visits not available for comparison; recompute this position")
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/sequence/{key}/{det}/numeric/{kind}/{index}.npz")
+def sequence_numeric(key: str, det: str, kind: str, index: int, generation: str | None = None):
+    if not SEQUENCE_KEY.fullmatch(key) or det not in pipeline.DETECTORS or kind not in ("frames", "visits") or index < 0:
+        raise HTTPException(404, "Not found")
+    if generation is not None and not re.fullmatch('[a-f0-9]{32}', generation):
+        raise HTTPException(404, 'Not found')
+    path = pipeline.product_dir(key, det, generation) / kind / f"{index}.npz"
+    if not path.is_file():
+        raise HTTPException(404, "Numerical data are unavailable")
+    return FileResponse(path, media_type="application/octet-stream", filename=f"{det}-{kind}-{index}.npz")
 
 
 @app.get("/api/sequence/{key}/{det}/matched/{a}/{b}.png")
 def sequence_matched(key: str, det: str, a: int, b: int):
-    if not SEQUENCE_KEY.match(key) or det not in pipeline.DETECTORS or not (0 <= a < 16 and 0 <= b < 16):
+    if not SEQUENCE_KEY.fullmatch(key) or det not in pipeline.DETECTORS or not (0 <= a < 16 and 0 <= b < 16):
         raise HTTPException(404, "Not found")
     path = pipeline.product_dir(key, det) / "pairs" / f"matched-{a}-{b}.png"
     if not path.exists():
         raise HTTPException(404, "Request the matched comparison product first")
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/sequence/{key}/{det}/{name}")
 def sequence_file(key: str, det: str, name: str):
     files = {"difference.png": "image/png", "blink.gif": "image/gif"}
-    if not SEQUENCE_KEY.match(key) or det not in pipeline.DETECTORS or name not in files:
+    if not SEQUENCE_KEY.fullmatch(key) or det not in pipeline.DETECTORS or name not in files:
         raise HTTPException(404, "Not found")
     path = pipeline.product_dir(key, det) / name
     if not path.exists():
         raise HTTPException(404, "Not found")
-    return FileResponse(path, media_type=files[name], headers={"Cache-Control": "public, max-age=86400"})
+    return FileResponse(path, media_type=files[name], headers={"Cache-Control": "no-cache"})
 
 
 def _manifest(key, det):
-    if not SEQUENCE_KEY.match(key) or det not in pipeline.DETECTORS:
+    if not SEQUENCE_KEY.fullmatch(key) or det not in pipeline.DETECTORS:
         raise HTTPException(404, "Not found")
     path = pipeline.SEQUENCES / key / det / "manifest.json"
     if not path.exists():
         raise HTTPException(404, "Detector sequence is not prepared")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+@app.get('/api/science/{key}/coverage')
+def spectral_coverage(key: str, det: str = 'D6'):
+    manifest = _manifest(key, det)
+    result = coverage(pipeline.product_dir(key, det), manifest)
+    return {**result, 'display': manifest.get('display'), 'grid': manifest['grid']}
+
+
+@app.get('/api/science/{key}/pixel')
+def science_pixel(key: str, index: int, x: int, y: int, det: str = 'D6'):
+    manifest = _manifest(key, det)
+    try:
+        return inspect_pixel(pipeline.product_dir(key, det), manifest, index, x, y)
+    except (ValueError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error))
+
+
+@app.get('/api/science/{key}/catalog')
+def science_catalog(key: str, index: int, catalog: str, det: str = 'D6'):
+    manifest = _manifest(key, det)
+    try:
+        return catalog_overlay(manifest, index, catalog)
+    except ValueError as error:
+        raise HTTPException(422, str(error))
+    except CatalogError as error:
+        raise HTTPException(502, str(error))
+
+
+@app.get('/api/science/{key}/band.{format}')
+def science_band(key: str, low: float, high: float, visit: int = 0, det: str = 'D6', format: str = 'png'):
+    manifest = _manifest(key, det)
+    if format not in ('png', 'fits'):
+        raise HTTPException(404, 'Not found')
+    try:
+        stack, variance, count = spectral_band(pipeline.product_dir(key, det), manifest, visit, low, high)
+    except (ValueError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error))
+    if format == 'fits':
+        return Response(band_fits(stack, variance, count, manifest, visit, low, high), media_type='application/fits',
+                        headers={'Content-Disposition':'attachment; filename="spectral-band.fits"'})
+    import io
+    import numpy as np
+    valid = np.isfinite(stack)
+    if not valid.any():
+        raise HTTPException(422, 'No valid measurements in the selected wavelength interval')
+    lo, hi = np.percentile(stack[valid], [1, 99.5])
+    image = pipeline.render(pipeline.stretch(stack, lo, hi), ~valid, np.zeros_like(valid), max(2, round(470/stack.shape[0])))
+    output = io.BytesIO()
+    image.save(output, format='PNG')
+    return Response(output.getvalue(), media_type='image/png', headers={'Cache-Control':'no-cache'})
+
+
+@app.get('/api/science/{key}/aperture')
+def science_aperture(key: str, x: float, y: float, visit: int, det: str = 'D6',
+                     radius: float = 2., inner: float = 3., outer: float = 5., format: str = 'json'):
+    manifest = _manifest(key, det)
+    if format not in ('json', 'csv') or visit < 0 or visit >= len(manifest.get('visits', [])):
+        raise HTTPException(422, 'Choose an available visit and json or csv format')
+    try:
+        result = aperture_spectrum(pipeline.product_dir(key, det), manifest, x, y, visit, radius, inner, outer)
+    except (ValueError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error))
+    if format == 'json':
+        return result
+    import csv
+    import io
+    output = io.StringIO(newline='')
+    output.write('# ' + json.dumps({k: v for k, v in result.items() if k != 'points'}) + '\n')
+    writer = csv.DictWriter(output, fieldnames=['wavelength_um', 'flux', 'uncertainty', 'usable_aperture_fraction', 'obs_id', 'time_utc', 'visit'])
+    writer.writeheader()
+    writer.writerows(result['points'])
+    return Response(output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="preliminary-spectrum.csv"'})
 
 
 @app.get("/api/science/{key}/quality")
@@ -177,18 +266,28 @@ def science_matched(key: str, det: str = "D6", a: int = 0, b: int = 1):
     visits = manifest.get("visits", [])
     if a < 0 or b < 0 or a >= len(visits) or b >= len(visits) or a == b:
         raise HTTPException(404, "Visits are not available for wavelength matching")
-    common = matched_range(visits[a], visits[b])
-    if common is None:
-        raise HTTPException(422, "The selected visits have no shared wavelength range")
     folder = pipeline.product_dir(key, det)
     output = folder / "pairs" / f"matched-{a}-{b}.png"
     product = matched_difference(folder, manifest, a, b, output)
     if product is None:
-        raise HTTPException(422, "Matching wavelength frames are not available for both visits")
-    return {"detector": det, "visit_a": a, "visit_b": b, "shared_wavelength": common,
+        raise HTTPException(422, "No compatible pixelwise passbands; refresh older sequences to prepare wavelength maps")
+    return {"detector": det, "visit_a": a, "visit_b": b,
             "difference_url": f"/api/sequence/{key}/{det}/matched/{a}/{b}.png",
             "frames_used": {"a": product["frames_a"], "b": product["frames_b"]},
-            "method": "only frames inside the shared wavelength interval were stacked before subtraction"}
+            "fits_url": f"/api/sequence/{key}/{det}/matched/{a}/{b}.fits",
+            "usable_grid_fraction": product["usable_grid_fraction"],
+            "method": "inverse variance stacks with pixelwise wavelength centers within 0.25 of the narrower local FWHM; diagnostic B-A",
+            "limitations": "No PSF matching or field-star registration; neighboring resampled pixels are correlated. This is not a detection."}
+
+
+@app.get("/api/sequence/{key}/{det}/matched/{a}/{b}.fits")
+def matched_fits(key: str, det: str, a: int, b: int):
+    if not SEQUENCE_KEY.fullmatch(key) or det not in pipeline.DETECTORS or min(a, b) < 0:
+        raise HTTPException(404, "Not found")
+    path = pipeline.product_dir(key, det) / "pairs" / f"matched-{a}-{b}.fits"
+    if not path.exists():
+        raise HTTPException(404, "Generate the diagnostic comparison first")
+    return FileResponse(path, media_type="application/fits", filename=f"{det}-{b}-minus-{a}.fits")
 
 
 @app.get("/api/science/{key}/spectrum")
@@ -213,7 +312,7 @@ def science_colour(key: str, visit: int):
     result = colour_composite(pipeline.SEQUENCES / key, manifests, visit, output)
     if result is None:
         raise HTTPException(404, "All six detector visits are required for this colour composite")
-    return FileResponse(output, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return FileResponse(output, media_type="image/png", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/moving/ephemeris")

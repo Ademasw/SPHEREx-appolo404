@@ -23,7 +23,7 @@ function ArchiveControls({ children }) {
   return controlMount ? createPortal(children, controlMount) : children;
 }
 
-const date = value => new Date(value.endsWith('Z') ? value : value + 'Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const date = value => new Date(/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? value : value + 'Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const time = value => value.slice(11, 19);
 const TARGETS = ["Barnard's Star", 'Epsilon Indi B', 'WISE 0855', 'RW Aurigae', 'R Draconis'];
 const DETECTORS = [
@@ -44,7 +44,7 @@ const STAGES = {
 function readUrl() {
   try {
     const value = parseViewerQuery(location.search);
-    return { ...value, q: value.q || 'WISE 0855', det: value.det === 'all' ? `D${value.displayDetector}` : value.det };
+    return { ...value, q: value.q || 'WISE 0855', requestedDet: value.det, det: value.det === 'all' ? `D${value.displayDetector}` : value.det };
   } catch (error) {
     return { q: '', det: 'D6', fov: .1, view: 'visits', frame: 0, a: null, b: null, cmp: 'side', bg: 'model', clean: false, smooth: true, error: error.message };
   }
@@ -137,7 +137,7 @@ function App() {
 
   useEffect(() => {
     if (initial.error) return;
-    const search = updateViewerQuery(location.search, { q: request.q, det: initial.det === 'all' ? 'all' : request.det, fov: request.fov, bg: request.bg, clean: request.clean, smooth: request.smooth, view,
+    const search = updateViewerQuery(location.search, { q: request.q, det: initial.requestedDet === 'all' && request.det === initial.det ? 'all' : request.det, fov: request.fov, bg: request.bg, clean: request.clean, smooth: request.smooth, view,
       ...(view === 'compare' ? { a, b, cmp: compareMode, frame: null } : { frame: index, a: null, b: null, cmp: null }) });
     history.replaceState(null, '', search);
     if (window.parent !== window) window.parent.postMessage({ type: 'archive-state', search }, window.location.origin);

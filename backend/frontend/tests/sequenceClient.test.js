@@ -26,3 +26,11 @@ test('invalid detectors and malformed job states fail immediately', async () => 
  await assert.rejects(loadSequence({...params,settings:{...params.settings,detectorArray:'9'}}), /Select detector/);
  await assert.rejects(loadSequence(params,{fetchImpl:async()=>({ok:true,json:async()=>({status:'unknown'})})}), /Unexpected processing state/);
 });
+test('refresh posts once and then polls without restarting the job', async () => {
+ const calls=[];
+ await loadSequence(params,{refresh:true,wait:async()=>{},fetchImpl:async(url,options)=>{
+  calls.push([url,options.method]);return {ok:true,json:async()=>calls.length===1?{status:'running'}:done};
+ }});
+ assert.match(calls[0][0], /sequence\/refresh/);assert.equal(calls[0][1],'POST');
+ assert.doesNotMatch(calls[1][0], /refresh/);assert.equal(calls[1][1],'GET');
+});

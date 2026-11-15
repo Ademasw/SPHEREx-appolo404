@@ -25,6 +25,11 @@ export function parseViewerQuery(search) {
     if (value && !Number.isFinite(Date.parse(value))) throw new Error(`Invalid ${key} date`);
     return value;
   };
+  if (p.has('wmin') || p.has('wmax')) {
+    const low = Number(p.get('wmin')), high = Number(p.get('wmax'));
+    if (!p.get('wmin') || !p.get('wmax') || !Number.isFinite(low) || !Number.isFinite(high) || low < .7 || high > 5.1 || low >= high)
+      throw new Error('Invalid wavelength interval in viewer URL');
+  }
   return { q, det: choice('det', ['D1','D2','D3','D4','D5','D6','all'], 'D6'),
     fov: Number(choice('fov', ['0.05','0.1','0.2'], '0.1')),
     bg: choice('bg', ['model','median','none'], 'model'),

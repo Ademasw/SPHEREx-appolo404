@@ -1,5 +1,5 @@
 import { loadSequence } from './sequenceClient.js';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 export const isBackendConfigured = () => true;
 export const DEFAULT_FILTER = { enabled: true, model: 'spherex', strength: 100, maskSaturated: true };
 export const DEFAULT_SETTINGS = { epoch1Label: 'Epoch 1', epoch1Date: '', epoch2Label: 'Epoch 2', epoch2Date: '', fovArcmin: '6', detectorArray: '6', playerFps: 3, cleanMask: false, smoothDisplay: true };

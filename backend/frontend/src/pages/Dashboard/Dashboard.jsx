@@ -6,7 +6,7 @@
  * - Left: <Sidebar/> (logo, coordinates input, view switcher).
  * - Main: shared Overview and Settings accordions above the active media view.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -22,6 +22,7 @@ import {
 } from '../../services/observationApi';
 import './Dashboard.css';
 import { parseViewerQuery } from '../../services/viewerQuery.js';
+import ScienceInspector from './ScienceInspector.jsx';
 
 export default function Dashboard() {
   const location = useLocation();
@@ -81,6 +82,9 @@ export default function Dashboard() {
   );
   const [status, setStatus] = useState(isBackendConfigured() ? 'loading' : 'placeholder');
   const [error, setError] = useState(null);
+  const [reload, setReload] = useState(0);
+  const refreshNext = useRef(false);
+  const waiting = useRef(null);
 
   const loadObservation = useCallback(async (params, signal) => {
     setError(null);
@@ -94,7 +98,9 @@ export default function Dashboard() {
     setStatus('loading');
     setObservation(getPlaceholderObservation(params));
     try {
-      const data = await fetchObservation(params, { signal });
+      const refresh = refreshNext.current;
+      refreshNext.current = false;
+      const data = await fetchObservation(params, { signal, refresh });
       if (signal.aborted) return;
       setObservation(data);
       setStatus(params.coordinates.trim() ? 'ready' : 'idle');
@@ -114,6 +120,7 @@ export default function Dashboard() {
     }
     const params = { coordinates, filter: filterConfig, settings: settingsConfig };
     const controller = new AbortController();
+    waiting.current = controller;
     loadObservation(params, controller.signal);
 
     const unsubscribe = subscribeObservationStream(params, {
@@ -132,7 +139,7 @@ export default function Dashboard() {
       controller.abort();
       unsubscribe();
     };
-  }, [coordinates, filterConfig, settingsConfig, loadObservation, parsed]);
+  }, [coordinates, filterConfig, settingsConfig, loadObservation, parsed, reload]);
 
   return (
     <div className="dashboard">
@@ -164,6 +171,12 @@ export default function Dashboard() {
               error,
             }}
           />
+          {!location.pathname.endsWith('/advanced') && coordinates && <p>
+            <button disabled={status === 'loading'} onClick={() => {refreshNext.current = true; setReload(value => value + 1);}}>Refresh archive</button>
+            {status === 'loading' && <button onClick={() => {waiting.current?.abort(); setStatus('idle');}}>Stop waiting</button>}
+            {status === 'loading' && <span> Server processing continues safely if you stop waiting.</span>}
+          </p>}
+          <ScienceInspector observation={observation} status={status} />
 
         </motion.div>
       </main>
