@@ -19,15 +19,18 @@ export async function loadSequence(params, { signal, base = '', fetchImpl = fetc
  const fov = Number(settings.fovArcmin) / 60;
  if (![0.05, 0.1, 0.2].includes(fov)) throw new Error('Supported fields of view: 3, 6 or 12 arcmin.');
  const detectors = settings.detectorArray === 'all' ? [1,2,3,4,5,6] : [Number(settings.detectorArray)];
+ if (detectors.some(det => !Number.isInteger(det) || det < 1 || det > 6)) throw new Error('Select detector D1 to D6, or all.');
  const states = [];
  // Sequential scheduling avoids flooding the existing bounded worker pool.
  for (const det of detectors) {
-  const query = new URLSearchParams({ q: params.coordinates, det: `D${det}`, fov: String(fov), bg: params.filter?.enabled === false ? 'none' : 'model', clean: String(Boolean(settings.cleanMask)), smooth: String(settings.smoothDisplay !== false) });
+  const query = new URLSearchParams({ q: params.coordinates, det: `D${det}`, fov: String(fov), bg: params.filter?.enabled === false ? 'none' : params.filter?.background || 'model', clean: String(Boolean(settings.cleanMask)), smooth: String(settings.smoothDisplay !== false) });
   const deadline = Date.now() + 20 * 60 * 1000;
   while (true) {
+   signal?.throwIfAborted();
    const state = await request(`/api/sequence?${query}`, signal, base, fetchImpl);
    if (state.status === 'done') { states.push(state); break; }
    if (state.status === 'error') throw new Error(state.error || 'Processing failed');
+   if (!['queued', 'running'].includes(state.status)) throw new Error('Unexpected processing state returned by server.');
    if (Date.now() > deadline) throw new Error('Processing is taking longer than 20 minutes. Submit again to check the cached job.');
    await wait(signal);
   }

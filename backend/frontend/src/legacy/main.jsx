@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 import './purple-theme.css';
+import { parseViewerQuery, updateViewerQuery } from '../services/viewerQuery.js';
 
 // Presentation-only portal: the same controls keep their original handlers/state.
 const controlHost = window.parent !== window ? window.parent.document.getElementById('advanced-controls') : null;
@@ -41,22 +42,12 @@ const STAGES = {
 };
 
 function readUrl() {
-  const p = new URLSearchParams(location.search);
-  const q = p.get('q') || (p.get('ra') && p.get('dec') ? `${p.get('ra')} ${p.get('dec')}` : 'WISE 0855');
-  const fov = Number(p.get('fov'));
-  return {
-    q,
-    det: DETECTORS.some(([d]) => d === p.get('det')) ? p.get('det') : 'D6',
-    fov: FOVS.some(([f]) => f === fov) ? fov : 0.1,
-    view: VIEWS[p.get('view')] ? p.get('view') : 'visits',
-    frame: Math.max(0, Number(p.get('frame')) || 0),
-    a: p.get('a') == null ? null : Math.max(0, Number(p.get('a')) || 0),
-    b: p.get('b') == null ? null : Math.max(0, Number(p.get('b')) || 0),
-    cmp: COMPARE_MODES[p.get('cmp')] ? p.get('cmp') : 'side',
-    clean: p.get('clean') === 'true',
-    smooth: p.get('smooth') !== 'false',
-    bg: p.get('bg') === 'none' ? 'none' : 'model',
-  };
+  try {
+    const value = parseViewerQuery(location.search);
+    return { ...value, q: value.q || 'WISE 0855', det: value.det === 'all' ? `D${value.displayDetector}` : value.det };
+  } catch (error) {
+    return { q: '', det: 'D6', fov: .1, view: 'visits', frame: 0, a: null, b: null, cmp: 'side', bg: 'model', clean: false, smooth: true, error: error.message };
+  }
 }
 
 function App() {
@@ -101,6 +92,7 @@ function App() {
   useEffect(() => {
     let cancelled = false; let timer;
     const abort = new AbortController();
+    if (initial.error) { setJob({ status: 'error', error: initial.error }); return; }
     setManifest(null); setJob({ status: 'queued', stage: 'searching' }); setPlaying(false); setImageError(false);
     const params = new URLSearchParams({ q: request.q, det: request.det, fov: String(request.fov), bg: request.bg, clean: String(request.clean), smooth: String(request.smooth) });
     const poll = async () => {
@@ -142,10 +134,11 @@ function App() {
   }, [playing, speed, count]);
 
   useEffect(() => {
-    const query = new URLSearchParams({ q: request.q, det: request.det, fov: String(request.fov), bg: request.bg, clean: String(request.clean), smooth: String(request.smooth), view,
-      ...(view === 'compare' ? { a: String(a), b: String(b), cmp: compareMode } : { frame: String(index) }) });
-    history.replaceState(null, '', `?${query}`);
-    if (window.parent !== window) window.parent.postMessage({ type: 'archive-state', search: `?${query}` }, window.location.origin);
+    if (initial.error) return;
+    const search = updateViewerQuery(location.search, { q: request.q, det: initial.det === 'all' ? 'all' : request.det, fov: request.fov, bg: request.bg, clean: request.clean, smooth: request.smooth, view,
+      ...(view === 'compare' ? { a, b, cmp: compareMode, frame: null } : { frame: index, a: null, b: null, cmp: null }) });
+    history.replaceState(null, '', search);
+    if (window.parent !== window) window.parent.postMessage({ type: 'archive-state', search }, window.location.origin);
   }, [request, view, index, a, b, compareMode]);
 
   useEffect(() => {  // preload so the flipbook does not flicker

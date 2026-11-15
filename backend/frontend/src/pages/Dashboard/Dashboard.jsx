@@ -21,20 +21,24 @@ import {
   subscribeObservationStream,
 } from '../../services/observationApi';
 import './Dashboard.css';
+import { parseViewerQuery } from '../../services/viewerQuery.js';
 
 export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
+  const parsed = useMemo(() => {
+    try { return { value: parseViewerQuery(location.search) }; }
+    catch (error) { return { error: error.message }; }
+  }, [location.search]);
   const coordinates = query.get('q') || (query.has('ra') && query.has('dec') ? query.get('ra') + ' ' + query.get('dec') : location.state?.coordinates || '');
   const setCoordinates = value => {
     const next = new URLSearchParams(location.search);
     next.set('q', value); next.delete('ra'); next.delete('dec');
     navigate({ pathname: location.pathname, search: '?' + next }, { replace: true });
   };
-  const [filterConfig, setFilterConfig] = useState(() => ({ ...DEFAULT_FILTER, enabled: query.get('bg') !== 'none' }));
+  const filterConfig = useMemo(() => ({ ...DEFAULT_FILTER, enabled: parsed.value?.bg !== 'none', background: parsed.value?.bg || 'model' }), [parsed]);
   const setFilter = value => {
-    setFilterConfig(value);
     const next = new URLSearchParams(location.search);
     next.set('bg', value.enabled ? 'model' : 'none');
     navigate({ pathname: location.pathname, search: '?' + next }, { replace: true });
@@ -50,8 +54,12 @@ export default function Dashboard() {
       fovArcmin: [0.05, 0.1, 0.2].includes(Number(params.get('fov'))) ? String(Number(params.get('fov')) * 60) : DEFAULT_SETTINGS.fovArcmin,
       cleanMask: params.get('clean') === 'true',
       smoothDisplay: params.get('smooth') !== 'false',
+      playerFps: parsed.value?.playerFps ?? 3,
+      epoch1Label: parsed.value?.epoch1Label || 'Epoch 1',
+      epoch2Label: parsed.value?.epoch2Label || 'Epoch 2',
+      ...(params.has('displayDet') ? { displayDetector: parsed.value?.displayDetector } : {}),
     };
-  }, [localSettings, location.search]);
+  }, [localSettings, location.search, parsed]);
   const setSettingsConfig = value => {
     setLocalSettings(value);
     const next = new URLSearchParams(location.search);
@@ -61,6 +69,10 @@ export default function Dashboard() {
     next.set('epoch2', value.epoch2Date || '');
     next.set('clean', value.cleanMask ? 'true' : 'false');
     next.set('smooth', value.smoothDisplay === false ? 'false' : 'true');
+    next.set('fps', String(value.playerFps));
+    next.set('label1', value.epoch1Label || 'Epoch 1');
+    next.set('label2', value.epoch2Label || 'Epoch 2');
+    if (value.displayDetector) next.set('displayDet', value.displayDetector);
     navigate({ pathname: location.pathname, search: '?' + next }, { replace: true });
   };
 
@@ -95,6 +107,11 @@ export default function Dashboard() {
 
   // Re-fetch and re-subscribe whenever coordinates, Zodi filter, or settings change.
   useEffect(() => {
+    if (parsed.error) {
+      setError(parsed.error); setStatus('error');
+      setObservation(getPlaceholderObservation());
+      return;
+    }
     const params = { coordinates, filter: filterConfig, settings: settingsConfig };
     const controller = new AbortController();
     loadObservation(params, controller.signal);
@@ -115,7 +132,7 @@ export default function Dashboard() {
       controller.abort();
       unsubscribe();
     };
-  }, [coordinates, filterConfig, settingsConfig, loadObservation]);
+  }, [coordinates, filterConfig, settingsConfig, loadObservation, parsed]);
 
   return (
     <div className="dashboard">

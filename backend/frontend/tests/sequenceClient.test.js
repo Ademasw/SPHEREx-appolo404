@@ -22,3 +22,7 @@ test('abort stops pending polling',async()=>{
  const controller=new AbortController();
  await assert.rejects(loadSequence(params,{signal:controller.signal,fetchImpl:async()=>{controller.abort();return {ok:true,json:async()=>({status:'queued'})};}}),{name:'AbortError'});
 });
+test('invalid detectors and malformed job states fail immediately', async () => {
+ await assert.rejects(loadSequence({...params,settings:{...params.settings,detectorArray:'9'}}), /Select detector/);
+ await assert.rejects(loadSequence(params,{fetchImpl:async()=>({ok:true,json:async()=>({status:'unknown'})})}), /Unexpected processing state/);
+});

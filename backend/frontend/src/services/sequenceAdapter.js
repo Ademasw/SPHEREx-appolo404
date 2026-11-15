@@ -1,6 +1,7 @@
 // Pure contract adapter: never substitutes demo images for archive data.
 export function normalizeSequence(states, { coordinates = '', settings = {} } = {}, url = x => x) {
   const available = states.map(s => s.manifest);
+  if (!available.length || available.some(m => !m?.query)) throw new Error('No valid detector manifests returned');
   const selected = 'D' + (settings.displayDetector || available[0].query.detector.slice(1));
   const manifests = available.filter(m => m.query.detector === selected);
   if (!manifests.length) throw new Error('Selected detector is unavailable');
@@ -9,8 +10,9 @@ export function normalizeSequence(states, { coordinates = '', settings = {} } = 
   const first = manifests[0];
   const visits = (first.visits?.length ? first.visits : first.frames || []).slice()
     .sort((a, b) => a.time_utc.localeCompare(b.time_utc));
+  const utc = value => Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? value : value + 'Z');
   const nearest = (date, fallback) => date && visits.length
-    ? visits.reduce((best, v) => Math.abs(Date.parse(v.time_utc + 'Z') - Date.parse(date)) < Math.abs(Date.parse(best.time_utc + 'Z') - Date.parse(date)) ? v : best)
+    ? visits.reduce((best, v) => Math.abs(utc(v.time_utc) - Date.parse(date)) < Math.abs(utc(best.time_utc) - Date.parse(date)) ? v : best)
     : fallback;
   const chosen = [nearest(settings.epoch1Date, visits[0]), nearest(settings.epoch2Date, visits.at(-1))];
   const sharedWavelength = chosen[0] && chosen[1]
@@ -32,7 +34,8 @@ export function normalizeSequence(states, { coordinates = '', settings = {} } = 
       sharedWavelength: sharedWavelength && Number.isFinite(sharedWavelength.min) && Number.isFinite(sharedWavelength.max) && sharedWavelength.max > sharedWavelength.min ? sharedWavelength : null,
       spectrumUrl: `/api/science/${key}/spectrum`,
       colourUrl: colourReady ? `/api/science/${key}/colour/0.png` : null,
-      matchedDifferenceUrl: chosen[0] && chosen[1] ? `/api/sequence/${key}/${first.query.detector}/pair/${visits.indexOf(chosen[0])}/${visits.indexOf(chosen[1])}.png` : null,
+      matchedRequestUrl: first.visits?.length && chosen[0] && chosen[1] && chosen[0] !== chosen[1]
+        ? url(`/api/science/${key}/matched?det=${first.query.detector}&a=${chosen[0].index ?? visits.indexOf(chosen[0])}&b=${chosen[1].index ?? visits.indexOf(chosen[1])}`) : null,
       epsilonPanel: /epsilon/i.test(first.target?.name || '') ? { summaryUrl: '/api/epsilon', motionUrl: '/api/epsilon/motion' } : null,
     },
     metadata: {
@@ -44,10 +47,12 @@ export function normalizeSequence(states, { coordinates = '', settings = {} } = 
       'Field of View': `${first.query.fov_deg * 60} arcmin`,
       'Pixel Scale': `${first.grid?.pixel_arcsec ?? '—'} arcsec / px`,
       'Frame Count': frames.length,
+      'Archive Collections': first.archive?.collections?.join(', ') || 'See archive manifest',
+      'Archive Retrieved UTC': first.archive?.retrieved_at || 'Unknown',
       'Processing': first.processing?.steps?.join('; ') || 'See archive manifest',
       'Warnings': [...new Set(manifests.flatMap(m => m.warnings || []))].join(' '),
       'Epoch selection': 'Nearest available visit; dates do not request new archive epochs. Comparison uses the first selected detector.',
-      'Zodi Subtraction': 'Fixed backend processing: supplied ZODI + sky median; saturated cores excluded',
+      'Zodi Subtraction': first.query.background === 'none' ? 'Disabled: raw calibrated sky' : first.query.background === 'median' ? 'Sky median only' : 'Supplied ZODI + sky median; saturated cores excluded',
     },
   };
 }

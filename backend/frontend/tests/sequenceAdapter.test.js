@@ -31,3 +31,19 @@ test('same nearest visit is explicitly reported', () => {
  const result=normalizeSequence([state()],{settings:{epoch1Date:'2025-05-01',epoch2Date:'2025-05-03'}});
  assert.match(result.compare.epochs[1].meta,/same observation/);
 });
+test('UTC suffixes and actual visit indices are preserved in comparison requests', () => {
+ const s = state();
+ s.manifest.query.key = 'test';
+ s.manifest.visits = [
+  {index: 4, time_utc:'2025-11-02T00:00:00Z',image_url:'/late'},
+  {index: 2, time_utc:'2025-05-02T00:00:00+00:00',image_url:'/early'},
+ ];
+ const result = normalizeSequence([s],{settings:{epoch1Date:'2025-11-01',epoch2Date:'2025-05-01'}});
+ assert.equal(result.compare.epochs[0].imageUrl, '/late');
+ assert.match(result.science.matchedRequestUrl, /a=4&b=2/);
+});
+test('single-frame fallback cannot request visit differences', () => {
+ const s=state(); s.manifest.visits=[];
+ assert.equal(normalizeSequence([s]).science.matchedRequestUrl, null);
+ assert.throws(() => normalizeSequence([]), /No valid detector/);
+});

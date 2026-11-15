@@ -77,7 +77,7 @@ export default function CompareView() {
           </figure>
         ))}
       </div>
-      {observation.science?.sharedWavelength && <p className="text-small text-muted">Wavelength-matched range: {observation.science.sharedWavelength.min.toFixed(3)}–{observation.science.sharedWavelength.max.toFixed(3)} μm. <a href={`/api/science/${observation.science.sequenceKey}/matched?det=${observation.metadata['Displayed Detector'] || 'D6'}&a=0&b=1`} target="_blank" rel="noreferrer">Generate matched difference</a></p>}
+      {observation.science?.sharedWavelength && <p className="text-small text-muted">Central wavelength overlap: {observation.science.sharedWavelength.min.toFixed(3)}–{observation.science.sharedWavelength.max.toFixed(3)} μm. This does not establish pixelwise spectral compatibility. {observation.science.matchedRequestUrl && <a href={observation.science.matchedRequestUrl} target="_blank" rel="noreferrer">Generate diagnostic difference for selected visits</a>}</p>}
     </section>
   );
 }
