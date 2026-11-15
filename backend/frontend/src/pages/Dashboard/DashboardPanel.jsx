@@ -260,6 +260,10 @@ export default function DashboardPanel({
             <label className="field checkbox-field"><span className="text-caption text-muted">Background</span><span><input type="checkbox" checked={Boolean(draftFilter.enabled)} onChange={e => updateFilter({ enabled: e.target.checked })} /> Subtract supplied ZODI model</span></label>
           </div>
 
+          {draftSettings.detectorArray === 'all' && <label className="field">Displayed detector (Player and Compare)
+            <select value={draftSettings.displayDetector || '1'} onChange={e => setDraftSettings(prev => ({...prev,displayDetector:e.target.value}))}>
+              {['0.75–1.1','1.1–1.6','1.6–2.4','2.4–3.8','3.8–4.4','4.4–5.0'].map((band,i) => <option key={i} value={String(i+1)}>D{i+1} · {band} μm</option>)}
+            </select></label>}
           <p className="text-label text-muted">Instrument &amp; Player Inputs</p>
           <div className="form-grid">
             <label className="field">

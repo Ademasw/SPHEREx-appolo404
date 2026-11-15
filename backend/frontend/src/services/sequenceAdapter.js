@@ -2,7 +2,7 @@
 export function normalizeSequence(states, { coordinates = '', settings = {} } = {}, url = x => x) {
   const available = states.map(s => s.manifest);
   if (!available.length || available.some(m => !m?.query)) throw new Error('No valid detector manifests returned');
-  const selected = 'D' + (settings.displayDetector || available[0].query.detector.slice(1));
+  const selected = 'D' + (available.length > 1 ? settings.displayDetector || available[0].query.detector.slice(1) : available[0].query.detector.slice(1));
   const manifests = available.filter(m => m.query.detector === selected);
   if (!manifests.length) throw new Error('Selected detector is unavailable');
   const frames = manifests.flatMap(m => (m.frames || []).map(f => ({ ...f, detector: m.query.detector })))
@@ -12,7 +12,7 @@ export function normalizeSequence(states, { coordinates = '', settings = {} } = 
     .sort((a, b) => a.time_utc.localeCompare(b.time_utc));
   const utc = value => Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? value : value + 'Z');
   const nearest = (date, fallback) => date && visits.length
-    ? visits.reduce((best, v) => Math.abs(utc(v.time_utc) - Date.parse(date)) < Math.abs(utc(best.time_utc) - Date.parse(date)) ? v : best)
+    ? visits.reduce((best, v) => Math.abs(utc(v.time_utc) - utc(date)) < Math.abs(utc(best.time_utc) - utc(date)) ? v : best)
     : fallback;
   const chosen = [nearest(settings.epoch1Date, visits[0]), nearest(settings.epoch2Date, visits.at(-1))];
   const sharedWavelength = chosen[0] && chosen[1]

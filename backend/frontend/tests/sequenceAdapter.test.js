@@ -47,3 +47,14 @@ test('single-frame fallback cannot request visit differences', () => {
  assert.equal(normalizeSequence([s]).science.matchedRequestUrl, null);
  assert.throws(() => normalizeSequence([]), /No valid detector/);
 });
+
+test('selected timezone-free UTC epoch is independent of browser timezone', () => {
+ const previous=process.env.TZ; process.env.TZ='Asia/Bishkek';
+ try {
+  const s=state();s.manifest.visits=[{index:0,time_utc:'2025-05-01T00:00:00',image_url:'/first'},{index:1,time_utc:'2025-05-01T12:00:00',image_url:'/second'}];
+  assert.equal(normalizeSequence([s],{settings:{epoch1Date:'2025-05-01T12:00:00'}}).compare.epochs[0].imageUrl,'/second');
+ } finally {if(previous===undefined)delete process.env.TZ;else process.env.TZ=previous;}
+});
+test('single detector selection overrides stale all-array display choice', () => {
+ assert.equal(normalizeSequence([state('D6')],{settings:{detectorArray:'6',displayDetector:'2'}}).metadata['Displayed Detector'],'D6');
+});

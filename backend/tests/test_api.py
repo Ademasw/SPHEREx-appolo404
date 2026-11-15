@@ -47,7 +47,7 @@ def test_sequence_reports_progress_then_result(monkeypatch):
     assert first.json()["stage"] == "downloading"
     assert calls[0] == (133.7598, -7.2422, "D6", 0.1)  # position rounded for caching
     second = client.get("/api/sequence", params={"q": "133.75976527 -7.24218218"})
-    assert second.status_code == 200 and second.json()["manifest"] == {"frames": []}
+    assert second.status_code == 200 and second.json()["manifest"] == {"frames": [], "target": None}
 
 
 def test_sequence_validates_input():
@@ -118,3 +118,17 @@ def test_pair_difference_of_any_two_visits(tmp_path, monkeypatch):
     assert client.get("/api/sequence/10.0000_+0.0000_0.1/D6/pair/1/1.png").status_code == 404
     assert client.get("/api/sequence/10.0000_+0.0000_0.1/D6/pair/0/7.png").status_code == 404
     assert client.get("/api/sequence/bad/D6/pair/0/1.png").status_code == 404
+
+
+def test_cached_target_is_not_reused_for_coordinate_request(monkeypatch):
+    cached = {'target': {'name':'Wrong target'}, 'frames':[{'time_utc':'2025-01-01T00:00:00','predicted_position':{'x':1},'photometry':{'flux':123}}]}
+    def request(*args, **kwargs):
+        assert kwargs['target'] is None
+        return {'status':'done','manifest':cached}
+    monkeypatch.setattr('app.main.jobs.request',request)
+    response=TestClient(app).get('/api/sequence?ra=10&dec=0').json()['manifest']
+    assert response['target'] is None
+    assert response['frames'][0]['predicted_position'] is None
+    assert 'photometry' not in response['frames'][0]
+    assert cached['target']['name']=='Wrong target'
+    assert cached['frames'][0]['photometry']['flux']==123

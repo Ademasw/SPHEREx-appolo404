@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 /**
  * CompareView — View Mode B (Page 3): two epochs side-by-side.
  *
@@ -19,6 +20,19 @@ const STATUS_LABELS = {
 export default function CompareView() {
   const { coordinates, observation, status, error } = useOutletContext();
   const { compare } = observation;
+  const endpoint = observation.science?.matchedRequestUrl;
+  const [matched, setMatched] = useState(null);
+  const [matchError, setMatchError] = useState('');
+  const [matching, setMatching] = useState(false);
+  useEffect(() => {setMatched(null);setMatchError('');setMatching(false);}, [endpoint]);
+  useEffect(() => {
+    if (!matching || !endpoint) return;
+    const controller = new AbortController();
+    fetch(endpoint,{signal:controller.signal}).then(async response => {
+      const data=await response.json(); if (!response.ok) throw new Error(data.detail || 'Comparison unavailable'); return data;
+    }).then(data => {if (!controller.signal.aborted) setMatched(data);}).catch(error => {if(error.name !== 'AbortError') setMatchError(error.message);}).finally(() => {if(!controller.signal.aborted)setMatching(false);});
+    return () => controller.abort();
+  }, [matching,endpoint]);
 
   return (
     <section className="view">
@@ -77,7 +91,19 @@ export default function CompareView() {
           </figure>
         ))}
       </div>
-      {observation.science?.sharedWavelength && <p className="text-small text-muted">Central wavelength overlap: {observation.science.sharedWavelength.min.toFixed(3)}–{observation.science.sharedWavelength.max.toFixed(3)} μm. This does not establish pixelwise spectral compatibility. {observation.science.matchedRequestUrl && <a href={observation.science.matchedRequestUrl} target="_blank" rel="noreferrer">Generate diagnostic difference for selected visits</a>}</p>}
+      <div className="panel" style={{padding:20}}>
+        <p>Broadband visits above can contain different wavelengths. Spectral comparison selects compatible measurements at each pixel.</p>
+        <button disabled={!endpoint || matching || status !== 'ready'} onClick={() => {setMatchError('');setMatching(true);}}>Compare compatible wavelengths</button>
+        {!endpoint && status === 'ready' && <p>Choose two different available visits from the same detector.</p>}
+        {matching && <p>Checking local passbands…</p>}
+        {matchError && <p role="alert">{matchError}</p>}
+        {matched && <>
+          <img style={{maxWidth:'100%'}} src={new URL(matched.difference_url,new URL(endpoint,window.location.href)).href} alt="Compatible B minus A; white brighter, black fainter"/>
+          <p>B − A: white means brighter in B; black means fainter. Compatible coverage: {(matched.usable_grid_fraction*100).toFixed(1)}%.</p>
+          <p>{matched.limitations}</p>
+          <a href={new URL(matched.fits_url,new URL(endpoint,window.location.href)).href}>Export difference, mask and contributions (FITS)</a>
+        </>}
+      </div>
     </section>
   );
 }

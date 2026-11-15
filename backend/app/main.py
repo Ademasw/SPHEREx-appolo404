@@ -95,7 +95,7 @@ def sequence(response: Response, q: str | None = None, ra: float | None = None, 
     target = _motion_target(info)
     if target.get("pmra") is None or target.get("pmdec") is None:
         target = None
-    request_args = {"target": target, "background": bg}
+    request_args = {"target": None, "background": bg}
     if clean:
         request_args["clean"] = True
     if not smooth:
@@ -103,6 +103,23 @@ def sequence(response: Response, q: str | None = None, ra: float | None = None, 
     if refresh:
         request_args["refresh"] = True
     state = jobs.request(info["ra_deg"], info["dec_deg"], det, fov, **request_args)
+    if state['status'] == 'done':
+        import copy
+        from astropy.time import Time
+        from astropy.wcs import WCS
+        manifest = copy.deepcopy(state['manifest'])
+        manifest['target'] = target
+        header = manifest.get('grid', {}).get('header')
+        for kind in ('frames', 'visits'):
+            for item in manifest.get(kind, []):
+                for field in ('photometry', 'measured_position', 'saturated_at_target'):
+                    item.pop(field, None)
+                guess = pipeline.predicted(target, Time(item['time_utc'], format='isot'), WCS(header)) if target and header else None
+                if guess:
+                    crop = manifest['display']['crop']
+                    guess['display_fraction'] = pipeline.display_fraction(guess['grid_pixel'], manifest['grid']['size_px'], tuple(crop[k] for k in ('x0','y0','x1','y1')))
+                item['predicted_position'] = guess
+        state['manifest'] = manifest
     state["resolved"] = info
     if state["status"] == "error":
         response.status_code = 502
