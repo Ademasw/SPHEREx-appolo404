@@ -70,10 +70,6 @@ backend/
 docs/media/    screenshots and the demo animation
 ```
 
-## Use of AI
-
-We used AI assistants (Claude, Codex, Gemini) for research, data analysis and writing code. The team reviewed, ran and tested all of it against real archive data.
-
 ## Limitations
 
 Sphere Hunter is an exploratory tool. Differences, spectra and aperture measurements are quick-look diagnostics: they show where to look, but they are not a discovery, a calibrated spectrum or a significant motion measurement.
