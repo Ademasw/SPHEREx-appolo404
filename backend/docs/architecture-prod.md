@@ -1,6 +1,6 @@
 # Runtime architecture and viewer URL v1
 
-The maintained frontend is `backend/frontend`. `front/front` is a historical prototype. FastAPI serves the Vite build and `/api`; API errors remain JSON/404 rather than returning the SPA.
+The frontend is `backend/frontend`. FastAPI serves the Vite build and `/api`; API errors remain JSON/404 rather than returning the SPA.
 
 The server queries NASA/IPAC IRSA SIA for an enclosing circle around the requested TAN grid. It deduplicates observation identities, downloads cutout prefixes or public-cloud FITS sections, checks units and quality definitions, and uses Astropy celestial and spectral WCS. It aligns numerical data and diagonal variances, retains wavelength/bandwidth maps and nearest-sampled quality bits, stacks visits, and creates display products. PNGs are display-only. Spectrum and difference calculations read NPZ arrays.
 
