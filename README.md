@@ -58,21 +58,6 @@ The first request for a new position takes 30–60 s; afterwards it is served fr
 
 > This research uses data from the SPHEREx mission, funded by NASA and managed by the Jet Propulsion Laboratory, California Institute of Technology. Data are served by the NASA/IPAC Infrared Science Archive.
 
-## Run it
-
-Requires Python 3.12 and Node 20.
-
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
-cd frontend; npm ci; npm run build; cd ..
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
-
-Open http://127.0.0.1:8000 (API docs at `/docs`). With Docker: `docker compose up --build`.
-If the IRSA cutout service is down, set `SPHEREX_SOURCE=cloud` to read from NASA's S3 copy only.
-
 ## Repository
 
 ```
@@ -85,17 +70,9 @@ backend/
 docs/media/    screenshots and the demo animation
 ```
 
-## Team Apollo 404
+## Use of AI
 
-| | Role |
-|---|---|
-| **Islam** | Team lead, backend |
-| **Bekmyrza** | Backend, deployment |
-| **Keremet** | Backend |
-| | Backend |
-| | Frontend, design, presentation |
-
-**Use of AI.** We used AI assistants (Claude, Codex, Gemini) for research, data analysis and writing code. The team reviewed, ran and tested all of it against real archive data.
+We used AI assistants (Claude, Codex, Gemini) for research, data analysis and writing code. The team reviewed, ran and tested all of it against real archive data.
 
 ## Limitations
 
